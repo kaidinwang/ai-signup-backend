@@ -58,7 +58,7 @@
 
     <!-- Filters -->
     <div class="glass rounded-2xl p-4 flex items-center gap-4 flex-wrap">
-        <input id="searchInput" type="text" placeholder="🔍 搜尋姓名 / Email..." oninput="filterTable()" class="px-4 py-2 rounded-xl bg-slate-800 border border-white/10 text-white text-sm w-60">
+        <input id="searchInput" type="text" placeholder="🔍 搜尋姓名 / Email..." oninput="filterTable()" autocomplete="off" class="px-4 py-2 rounded-xl bg-slate-800 border border-white/10 text-white text-sm w-60">
         <select id="attendFilter" onchange="filterTable()" class="px-3 py-2 rounded-xl bg-slate-800 border border-white/10 text-white text-sm">
             <option value="">所有出席狀態</option>
             <option value="Yes">✅ 確認參加</option>
