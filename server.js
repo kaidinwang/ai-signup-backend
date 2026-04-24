@@ -217,8 +217,11 @@ async function sendReminders(type = 'day') {
   const emailSubject = type === 'hour' ? '⏰ AI 共學聚 30 分鐘後開始！' : '📅 明天提醒：AI 共學聚';
 
   for (const reg of result.rows) {
-    await sendEmail(reg.email, emailSubject, `嗨 ${reg.name}！\n\n${lineMsg}\n\n— AI 共學聚團隊 🧬`);
-    if (reg.line_user_id) await sendLine(reg.line_user_id, `嗨 ${reg.name}！\n\n${lineMsg}`);
+    if (reg.line_user_id) {
+      await sendLine(reg.line_user_id, `嗨 ${reg.name}！\n\n${lineMsg}`);
+    } else {
+      await sendEmail(reg.email, emailSubject, `嗨 ${reg.name}！\n\n${lineMsg}\n\n— AI 共學聚團隊 🧬`);
+    }
   }
 }
 
