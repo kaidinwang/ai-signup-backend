@@ -199,7 +199,7 @@ async function forwardToStockSystem(body) {
 
 app.post('/webhook', express.raw({ type: '*/*' }), lineMiddleware, async (req, res) => {
   res.sendStatus(200);
-  const body = JSON.parse(req.body.toString());
+  const body = Buffer.isBuffer(req.body) ? JSON.parse(req.body.toString()) : req.body;
   forwardToStockSystem(body);
   for (const event of body.events) {
     if (event.type === 'follow') {
