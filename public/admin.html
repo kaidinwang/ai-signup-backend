@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI 共學聚 — 後台管理</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&display=swap');
+        body { font-family: 'Noto Sans TC', sans-serif; background: #0f172a; color: #f8fafc; }
+        .glass { background: rgba(30,41,59,0.8); border: 1px solid rgba(255,255,255,0.08); }
+        .tag { display: inline-block; padding: 1px 8px; border-radius: 20px; font-size: 11px; margin: 1px; }
+        .stat-card { background: rgba(30,41,59,0.6); border: 1px solid rgba(255,255,255,0.08); border-radius: 16px; padding: 20px; text-align: center; }
+        table { border-collapse: collapse; width: 100%; }
+        th { background: rgba(15,23,42,0.8); padding: 10px 14px; text-align: left; font-size: 12px; color: #94a3b8; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; white-space: nowrap; }
+        td { padding: 12px 14px; border-bottom: 1px solid rgba(255,255,255,0.04); font-size: 13px; vertical-align: top; }
+        tr:hover td { background: rgba(255,255,255,0.02); }
+    </style>
+</head>
+<body class="min-h-screen p-6">
+
+<div id="loginScreen" class="fixed inset-0 flex items-center justify-center bg-slate-900 z-50">
+    <div class="glass rounded-2xl p-8 w-full max-w-sm text-center space-y-4">
+        <div class="text-4xl mb-2">🔐</div>
+        <h2 class="text-xl font-bold">後台管理登入</h2>
+        <input id="pwInput" type="password" placeholder="請輸入管理密碼" class="w-full p-3 rounded-xl bg-slate-800 border border-white/10 text-white text-center">
+        <button onclick="login()" class="w-full py-3 bg-blue-600 hover:bg-blue-500 rounded-xl font-bold transition-all">進入後台</button>
+        <p id="loginError" class="text-red-400 text-sm hidden">密碼錯誤</p>
+    </div>
+</div>
+
+<div id="mainContent" class="hidden max-w-7xl mx-auto space-y-6">
+    <!-- Header -->
+    <div class="flex items-center justify-between">
+        <div>
+            <h1 class="text-2xl font-bold">🧬 AI 共學聚 — 後台管理</h1>
+            <p class="text-slate-500 text-sm mt-1">5/4（一）20:00–21:00 | 報名管理系統</p>
+        </div>
+        <div class="flex gap-3">
+            <button onclick="sendReminder('day')" class="px-4 py-2 bg-yellow-600 hover:bg-yellow-500 rounded-xl text-sm font-medium transition-all flex items-center gap-2">
+                <i class="fas fa-bell"></i> 發送前一天提醒
+            </button>
+            <button onclick="sendReminder('hour')" class="px-4 py-2 bg-orange-600 hover:bg-orange-500 rounded-xl text-sm font-medium transition-all flex items-center gap-2">
+                <i class="fas fa-fire"></i> 發送 30 分鐘提醒
+            </button>
+            <button onclick="exportCSV()" class="px-4 py-2 bg-emerald-700 hover:bg-emerald-600 rounded-xl text-sm font-medium transition-all flex items-center gap-2">
+                <i class="fas fa-download"></i> 匯出 CSV
+            </button>
+            <button onclick="loadData()" class="px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-xl text-sm transition-all">
+                <i class="fas fa-sync"></i>
+            </button>
+        </div>
+    </div>
+
+    <!-- Stats -->
+    <div id="statsGrid" class="grid grid-cols-2 md:grid-cols-5 gap-4"></div>
+
+    <!-- Filters -->
+    <div class="glass rounded-2xl p-4 flex items-center gap-4 flex-wrap">
+        <input id="searchInput" type="text" placeholder="🔍 搜尋姓名 / Email..." oninput="filterTable()" class="px-4 py-2 rounded-xl bg-slate-800 border border-white/10 text-white text-sm w-60">
+        <select id="attendFilter" onchange="filterTable()" class="px-3 py-2 rounded-xl bg-slate-800 border border-white/10 text-white text-sm">
+            <option value="">所有出席狀態</option>
+            <option value="Yes">✅ 確認參加</option>
+            <option value="Maybe">🤔 不確定</option>
+            <option value="No">❌ 無法參加</option>
+        </select>
+        <select id="lineFilter" onchange="filterTable()" class="px-3 py-2 rounded-xl bg-slate-800 border border-white/10 text-white text-sm">
+            <option value="">LINE 綁定狀態</option>
+            <option value="linked">✅ 已綁定</option>
+            <option value="unlinked">❌ 未綁定</option>
+        </select>
+        <span id="countLabel" class="text-slate-500 text-sm ml-auto"></span>
+    </div>
+
+    <!-- Table -->
+    <div class="glass rounded-2xl overflow-hidden">
+        <div class="overflow-x-auto">
+            <table>
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>姓名</th>
+                        <th>Email</th>
+                        <th>出席</th>
+                        <th>LINE</th>
+                        <th>程度</th>
+                        <th>職業</th>
+                        <th>使用工具</th>
+                        <th>興趣領域</th>
+                        <th>來源</th>
+                        <th>報名時間</th>
+                    </tr>
+                </thead>
+                <tbody id="tableBody"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Tools Interest Charts -->
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div class="glass rounded-2xl p-5">
+            <h3 class="font-semibold mb-4 text-slate-300 text-sm uppercase tracking-wide">🛠️ 工具使用分佈</h3>
+            <div id="toolsChart" class="space-y-2"></div>
+        </div>
+        <div class="glass rounded-2xl p-5">
+            <h3 class="font-semibold mb-4 text-slate-300 text-sm uppercase tracking-wide">🧠 興趣領域分佈</h3>
+            <div id="interestChart" class="space-y-2"></div>
+        </div>
+    </div>
+</div>
+
+<script>
+let adminPw = '';
+let allData = [];
+let filteredData = [];
+
+function login() {
+    adminPw = document.getElementById('pwInput').value;
+    loadData();
+}
+
+async function loadData() {
+    try {
+        const res = await fetch(`/admin/api/registrations?pw=${encodeURIComponent(adminPw)}`);
+        if (res.status === 401) {
+            document.getElementById('loginError').classList.remove('hidden');
+            return;
+        }
+        const json = await res.json();
+        document.getElementById('loginScreen').classList.add('hidden');
+        document.getElementById('mainContent').classList.remove('hidden');
+        document.getElementById('loginError').classList.add('hidden');
+        allData = json.registrations;
+        renderStats(json.stats);
+        filteredData = [...allData];
+        renderTable();
+        renderCharts();
+    } catch (e) {
+        alert('無法連線到後端伺服器，請確認是否已啟動');
+    }
+}
+
+function renderStats(stats) {
+    const cards = [
+        { label: '總報名', value: stats.total,        color: 'text-blue-400',   icon: '👥' },
+        { label: '確認參加', value: stats.attending,  color: 'text-emerald-400', icon: '✅' },
+        { label: '不確定', value: stats.maybe,         color: 'text-yellow-400', icon: '🤔' },
+        { label: '無法參加', value: stats.notAttending,color: 'text-slate-400',  icon: '❌' },
+        { label: 'LINE 已綁定', value: stats.lineLinked, color: 'text-green-400', icon: '💬' },
+    ];
+    document.getElementById('statsGrid').innerHTML = cards.map(c => `
+        <div class="stat-card">
+            <div class="text-2xl mb-1">${c.icon}</div>
+            <div class="text-3xl font-bold ${c.color}">${c.value}</div>
+            <div class="text-xs text-slate-500 mt-1">${c.label}</div>
+        </div>
+    `).join('');
+}
+
+const attendBadge = {
+    Yes:   '<span class="tag bg-emerald-500/20 text-emerald-300">✅ 確認</span>',
+    Maybe: '<span class="tag bg-yellow-500/20 text-yellow-300">🤔 不確定</span>',
+    No:    '<span class="tag bg-slate-500/20 text-slate-400">❌ 無法</span>',
+};
+
+function renderTable() {
+    const q = (document.getElementById('searchInput')?.value || '').toLowerCase();
+    const af = document.getElementById('attendFilter')?.value || '';
+    const lf = document.getElementById('lineFilter')?.value || '';
+
+    filteredData = allData.filter(r => {
+        const matchSearch = !q || r.name.toLowerCase().includes(q) || r.email.toLowerCase().includes(q);
+        const matchAttend = !af || r.attendance === af;
+        const matchLine   = !lf || (lf === 'linked' ? !!r.line_user_id : !r.line_user_id);
+        return matchSearch && matchAttend && matchLine;
+    });
+
+    document.getElementById('countLabel').textContent = `顯示 ${filteredData.length} / ${allData.length} 筆`;
+
+    document.getElementById('tableBody').innerHTML = filteredData.map((r, i) => `
+        <tr>
+            <td class="text-slate-500">${i + 1}</td>
+            <td class="font-medium">${esc(r.name)}</td>
+            <td class="text-slate-400 text-xs">${esc(r.email)}</td>
+            <td>${attendBadge[r.attendance] || ''}</td>
+            <td>
+                ${r.line_user_id ? '<span class="tag bg-green-500/20 text-green-300">✅ 已綁定</span>' : '<span class="tag bg-slate-700 text-slate-500">未綁定</span>'}
+                ${r.subscribe_line === 'yes' ? '<span class="tag bg-green-900/40 text-green-500">已訂閱</span>' : ''}
+            </td>
+            <td><span class="tag bg-purple-500/10 text-purple-300">${esc(r.level || '—')}</span></td>
+            <td class="text-xs text-slate-400 whitespace-nowrap">${esc(r.job_type || '—')}</td>
+            <td class="text-xs text-slate-400 max-w-[160px]">${formatTags(r.tools, 'blue')}</td>
+            <td class="text-xs text-slate-400 max-w-[160px]">${formatTags(r.interests, 'purple')}</td>
+            <td class="text-xs text-slate-500">${esc(r.source || '—')}</td>
+            <td class="text-xs text-slate-500 whitespace-nowrap">${formatDate(r.created_at)}</td>
+        </tr>
+    `).join('') || '<tr><td colspan="10" class="text-center text-slate-600 py-10">沒有符合的報名者</td></tr>';
+}
+
+function filterTable() { renderTable(); }
+
+function renderCharts() {
+    renderBarChart('toolsChart', countField('tools'));
+    renderBarChart('interestChart', countField('interests'));
+}
+
+function countField(field) {
+    const counts = {};
+    for (const r of allData) {
+        if (!r[field]) continue;
+        r[field].split('、').forEach(v => {
+            v = v.trim();
+            if (v) counts[v] = (counts[v] || 0) + 1;
+        });
+    }
+    return Object.entries(counts).sort((a, b) => b[1] - a[1]);
+}
+
+function renderBarChart(id, entries) {
+    const max = entries[0]?.[1] || 1;
+    document.getElementById(id).innerHTML = entries.map(([label, count]) => `
+        <div class="flex items-center gap-3 text-sm">
+            <div class="text-slate-400 w-32 truncate flex-shrink-0" title="${esc(label)}">${esc(label)}</div>
+            <div class="flex-1 bg-slate-800 rounded-full h-2">
+                <div class="bg-blue-500 h-2 rounded-full" style="width:${(count/max*100).toFixed(0)}%"></div>
+            </div>
+            <div class="text-slate-500 w-6 text-right">${count}</div>
+        </div>
+    `).join('') || '<p class="text-slate-600 text-sm">尚無資料</p>';
+}
+
+async function sendReminder(type) {
+    if (!confirm(`確定要發送「${type === 'hour' ? '30分鐘前' : '前一天'}」提醒給所有確認/不確定出席的報名者？`)) return;
+    const res = await fetch(`/admin/api/send-reminder?pw=${encodeURIComponent(adminPw)}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type }),
+    });
+    const json = await res.json();
+    alert(json.message || '已發送');
+}
+
+function exportCSV() {
+    const headers = ['姓名','Email','出席','程度','職業','工具','興趣領域','來源','LINE綁定','已訂閱LINE@','報名時間'];
+    const rows = filteredData.map(r => [
+        r.name, r.email, r.attendance, r.level, r.job_type, r.tools, r.interests, r.source,
+        r.line_user_id ? '是' : '否', r.subscribe_line === 'yes' ? '是' : '否', r.created_at,
+    ].map(v => `"${String(v || '').replace(/"/g, '""')}"`).join(','));
+    const csv = '﻿' + [headers.join(','), ...rows].join('\n');
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
+    a.download = `AI共學聚報名_${new Date().toLocaleDateString('zh-TW').replace(/\//g,'-')}.csv`;
+    a.click();
+}
+
+function esc(s) { return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function formatTags(str, color) {
+    if (!str) return '<span class="text-slate-600">—</span>';
+    return str.split('、').map(t => t.trim()).filter(Boolean)
+        .map(t => `<span class="tag bg-${color}-500/10 text-${color}-300">${esc(t)}</span>`).join('');
+}
+function formatDate(s) {
+    if (!s) return '—';
+    return new Date(s).toLocaleString('zh-TW', { month:'numeric', day:'numeric', hour:'2-digit', minute:'2-digit' });
+}
+
+document.getElementById('pwInput')?.addEventListener('keydown', e => e.key === 'Enter' && login());
+</script>
+</body>
+</html>
