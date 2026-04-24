@@ -339,6 +339,8 @@
 </div>
 
 <script>
+const BACKEND = 'https://ai-signup-backend.onrender.com';
+
 document.getElementById('registerForm').addEventListener('submit', async function(e) {
     e.preventDefault();
     const btn = document.getElementById('submitBtn');
@@ -358,7 +360,6 @@ document.getElementById('registerForm').addEventListener('submit', async functio
     }
 
     try {
-        const BACKEND = 'https://ai-signup-backend.onrender.com';
         const res = await fetch(`${BACKEND}/register`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
