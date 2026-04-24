@@ -9,7 +9,11 @@ const path = require('path');
 
 const app = express();
 app.use(cors());
-app.use(express.json());
+// /webhook 用 raw body（LINE 簽章驗證需要），其餘用 JSON
+app.use((req, res, next) => {
+  if (req.path === '/webhook') return next();
+  express.json()(req, res, next);
+});
 app.use(express.static(path.join(__dirname, 'public')));
 
 // ─── Database (PostgreSQL) ───────────────────────────────────────────────────
@@ -193,10 +197,11 @@ async function forwardToStockSystem(body) {
   }
 }
 
-app.post('/webhook', lineMiddleware, async (req, res) => {
+app.post('/webhook', express.raw({ type: '*/*' }), lineMiddleware, async (req, res) => {
   res.sendStatus(200);
-  forwardToStockSystem(req.body);
-  for (const event of req.body.events) {
+  const body = JSON.parse(req.body.toString());
+  forwardToStockSystem(body);
+  for (const event of body.events) {
     if (event.type === 'follow') {
       await lineClient.replyMessage(event.replyToken, {
         type: 'text',
