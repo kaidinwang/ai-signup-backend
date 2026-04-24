@@ -113,9 +113,23 @@ app.post('/register', async (req, res) => {
   }
 
   // 防呆：已報名直接回傳提示
-  const existing = await pool.query('SELECT name, attendance FROM registrations WHERE email=$1', [email.toLowerCase()]);
+  const existing = await pool.query('SELECT name, attendance, line_user_id FROM registrations WHERE email=$1', [email.toLowerCase()]);
   if (existing.rows[0]) {
-    return res.json({ success: false, duplicate: true, name: existing.rows[0].name, attendance: existing.rows[0].attendance });
+    const reg = existing.rows[0];
+    if (reg.line_user_id) {
+      // 已綁 LINE → 推 LINE 提醒
+      await sendLine(reg.line_user_id,
+        `嗨 ${reg.name}！\n\n你剛才嘗試再次報名 AI 共學聚 👀\n\n你已經報名過了，不用重複填喔！\n\n📅 5/4（一）20:00–21:00 線上見 🧬`
+      );
+    } else {
+      // 未綁 LINE → Email 提醒並鼓勵加入 LINE@
+      await sendEmail(
+        email,
+        '📋 你已報名 AI 共學聚！',
+        `嗨 ${reg.name}！\n\n你已經報名過 AI 共學聚了，不需要重複填寫 ✅\n\n📅 活動時間：5/4（一）20:00–21:00\n\n📲 還沒加入我們的 LINE@ 嗎？\n掃描表單上的 QR Code 加入，活動前會自動提醒你！\n\n— AI 共學聚團隊 🧬`
+      );
+    }
+    return res.json({ success: false, duplicate: true, name: reg.name, attendance: reg.attendance });
   }
 
   const interestStr = Array.isArray(interest) ? interest.join('、') : (interest || '');
