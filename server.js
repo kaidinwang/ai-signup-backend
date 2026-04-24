@@ -143,7 +143,11 @@ app.post('/register', async (req, res) => {
 });
 
 // LINE Webhook
-app.post('/webhook', line.middleware(lineConfig), async (req, res) => {
+const lineMiddleware = lineConfig.channelSecret
+  ? line.middleware(lineConfig)
+  : (req, res, next) => next();
+
+app.post('/webhook', lineMiddleware, async (req, res) => {
   res.sendStatus(200);
   for (const event of req.body.events) {
     if (event.type === 'follow') {
