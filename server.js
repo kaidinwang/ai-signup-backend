@@ -223,6 +223,7 @@ app.get('/line-callback', async (req, res) => {
       }),
     });
     const token = await tokenRes.json();
+    console.log('[LINE Login] token response:', JSON.stringify(token));
     if (!token.access_token) return res.redirect('/?bound=fail');
 
     // 取得 LINE 使用者資料
