@@ -180,8 +180,22 @@ const lineMiddleware = lineConfig.channelSecret
   ? line.middleware(lineConfig)
   : (req, res, next) => next();
 
+async function forwardToStockSystem(body) {
+  if (!process.env.STOCK_WEBHOOK_URL) return;
+  try {
+    await fetch(process.env.STOCK_WEBHOOK_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+  } catch (err) {
+    console.error('[Forward Error]', err.message);
+  }
+}
+
 app.post('/webhook', lineMiddleware, async (req, res) => {
   res.sendStatus(200);
+  forwardToStockSystem(req.body);
   for (const event of req.body.events) {
     if (event.type === 'follow') {
       await lineClient.replyMessage(event.replyToken, {
