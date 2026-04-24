@@ -203,6 +203,7 @@ app.get('/line-login', (req, res) => {
 
 // Step 2: LINE 授權完回到這裡
 app.get('/line-callback', async (req, res) => {
+  console.log('[LINE Callback] query:', JSON.stringify(req.query));
   const { code, state } = req.query;
   if (!code || !state) return res.redirect('/?bound=fail');
 
