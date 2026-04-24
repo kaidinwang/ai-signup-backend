@@ -186,7 +186,7 @@ app.get('/line-login', (req, res) => {
   const { email } = req.query;
   if (!email) return res.status(400).send('缺少 email');
   const state = Buffer.from(email).toString('base64');
-  const callbackUrl = `${process.env.BASE_URL}/line-callback`;
+  const callbackUrl = `${process.env.BASE_URL || 'https://ai-signup-backend.onrender.com'}/line-callback`;
   const url = new URL('https://access.line.me/oauth2/v2.1/authorize');
   url.searchParams.set('response_type', 'code');
   url.searchParams.set('client_id', process.env.LINE_LOGIN_CHANNEL_ID);
@@ -203,7 +203,7 @@ app.get('/line-callback', async (req, res) => {
   if (!code || !state) return res.redirect('/?bound=fail');
 
   const email = Buffer.from(state, 'base64').toString('utf8');
-  const callbackUrl = `${process.env.BASE_URL}/line-callback`;
+  const callbackUrl = `${process.env.BASE_URL || 'https://ai-signup-backend.onrender.com'}/line-callback`;
 
   try {
     // 用 code 換 access token
