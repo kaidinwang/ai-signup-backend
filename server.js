@@ -87,6 +87,19 @@ async function sendLine(userId, message) {
 
 // ─── Routes ──────────────────────────────────────────────────────────────────
 
+// 即時檢查 email 是否已報名
+app.get('/check-email', async (req, res) => {
+  const { email } = req.query;
+  if (!email) return res.json({ registered: false });
+  const result = await pool.query('SELECT name, attendance FROM registrations WHERE email=$1', [email.toLowerCase()]);
+  if (result.rows[0]) {
+    const r = result.rows[0];
+    res.json({ registered: true, name: r.name, attendance: r.attendance });
+  } else {
+    res.json({ registered: false });
+  }
+});
+
 app.post('/register', async (req, res) => {
   const {
     name, email, attendance,
@@ -97,6 +110,12 @@ app.post('/register', async (req, res) => {
 
   if (!name || !email) {
     return res.status(400).json({ success: false, message: '姓名和 Email 為必填' });
+  }
+
+  // 防呆：已報名直接回傳提示
+  const existing = await pool.query('SELECT name, attendance FROM registrations WHERE email=$1', [email.toLowerCase()]);
+  if (existing.rows[0]) {
+    return res.json({ success: false, duplicate: true, name: existing.rows[0].name, attendance: existing.rows[0].attendance });
   }
 
   const interestStr = Array.isArray(interest) ? interest.join('、') : (interest || '');

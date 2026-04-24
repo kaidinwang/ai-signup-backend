@@ -103,8 +103,9 @@
             <!-- Email -->
             <div class="space-y-2">
                 <div class="section-title"><i class="fas fa-envelope text-blue-400"></i> 聯絡 Email <span class="text-red-400">*</span></div>
-                <input type="email" name="email" required placeholder="your@email.com" class="w-full p-3.5 rounded-xl text-sm">
+                <input type="email" name="email" id="emailInput" required placeholder="your@email.com" class="w-full p-3.5 rounded-xl text-sm">
                 <p class="text-xs text-slate-500 pl-1">活動資訊與提醒通知將寄送至此信箱</p>
+                <div id="emailAlert" class="hidden rounded-xl p-4 border text-sm"></div>
             </div>
 
             <!-- 出席確認 -->
@@ -358,6 +359,9 @@ document.getElementById('registerForm').addEventListener('submit', async functio
         if (result.success) {
             document.getElementById('successOverlay').classList.add('show');
             this.reset();
+            document.getElementById('emailAlert').classList.add('hidden');
+        } else if (result.duplicate) {
+            showEmailAlert(result.name, result.attendance);
         } else {
             alert(result.message || '送出失敗，請再試一次');
         }
@@ -367,6 +371,39 @@ document.getElementById('registerForm').addEventListener('submit', async functio
         btn.textContent = '確認報名 🚀';
         btn.disabled = false;
     }
+});
+
+// Email 即時檢查
+let checkTimer;
+document.getElementById('emailInput').addEventListener('blur', async function() {
+    const email = this.value.trim();
+    if (!email || !email.includes('@')) return;
+    try {
+        const res = await fetch(`${BACKEND}/check-email?email=${encodeURIComponent(email)}`);
+        const data = await res.json();
+        if (data.registered) showEmailAlert(data.name, data.attendance);
+        else document.getElementById('emailAlert').classList.add('hidden');
+    } catch (_) {}
+});
+
+function showEmailAlert(name, attendance) {
+    const box = document.getElementById('emailAlert');
+    const attendText = attendance === 'Yes' ? '已確認參加 ✅' : attendance === 'Maybe' ? '已填「不確定」🤔' : '已填「無法參加」❌';
+    box.className = 'rounded-xl p-4 border text-sm bg-yellow-500/10 border-yellow-500/30 text-yellow-300';
+    box.innerHTML = `
+        <div class="font-semibold mb-1">👋 ${name}，你已經報名過了！</div>
+        <div class="text-xs text-yellow-400/80">出席狀態：${attendText}</div>
+        <div class="text-xs text-slate-500 mt-1">如需修改資訊，請私訊主辦人</div>
+    `;
+    box.classList.remove('hidden');
+    document.getElementById('submitBtn').disabled = true;
+    document.getElementById('submitBtn').classList.add('opacity-50');
+}
+
+document.getElementById('emailInput').addEventListener('input', function() {
+    document.getElementById('emailAlert').classList.add('hidden');
+    document.getElementById('submitBtn').disabled = false;
+    document.getElementById('submitBtn').classList.remove('opacity-50');
 });
 </script>
 </body>
