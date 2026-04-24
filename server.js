@@ -179,6 +179,79 @@ app.post('/register', async (req, res) => {
   }
 });
 
+// ─── LINE Login OAuth ────────────────────────────────────────────────────────
+
+// Step 1: 導向 LINE 授權頁
+app.get('/line-login', (req, res) => {
+  const { email } = req.query;
+  if (!email) return res.status(400).send('缺少 email');
+  const state = Buffer.from(email).toString('base64');
+  const callbackUrl = `${process.env.BASE_URL}/line-callback`;
+  const url = new URL('https://access.line.me/oauth2/v2.1/authorize');
+  url.searchParams.set('response_type', 'code');
+  url.searchParams.set('client_id', process.env.LINE_LOGIN_CHANNEL_ID);
+  url.searchParams.set('redirect_uri', callbackUrl);
+  url.searchParams.set('state', state);
+  url.searchParams.set('scope', 'profile openid');
+  url.searchParams.set('bot_prompt', 'aggressive'); // 授權後同時提示加入 LINE@
+  res.redirect(url.toString());
+});
+
+// Step 2: LINE 授權完回到這裡
+app.get('/line-callback', async (req, res) => {
+  const { code, state } = req.query;
+  if (!code || !state) return res.redirect('/?bound=fail');
+
+  const email = Buffer.from(state, 'base64').toString('utf8');
+  const callbackUrl = `${process.env.BASE_URL}/line-callback`;
+
+  try {
+    // 用 code 換 access token
+    const tokenRes = await fetch('https://api.line.me/oauth2/v2.1/token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        grant_type: 'authorization_code',
+        code,
+        redirect_uri: callbackUrl,
+        client_id: process.env.LINE_LOGIN_CHANNEL_ID,
+        client_secret: process.env.LINE_LOGIN_CHANNEL_SECRET,
+      }),
+    });
+    const token = await tokenRes.json();
+    if (!token.access_token) return res.redirect('/?bound=fail');
+
+    // 取得 LINE 使用者資料
+    const profileRes = await fetch('https://api.line.me/v2/profile', {
+      headers: { Authorization: `Bearer ${token.access_token}` },
+    });
+    const profile = await profileRes.json();
+    const userId = profile.userId;
+    const displayName = profile.displayName;
+
+    // 寫入 DB 綁定
+    await pool.query(`
+      INSERT INTO line_bindings (line_user_id, display_name, email)
+      VALUES ($1,$2,$3) ON CONFLICT (line_user_id) DO UPDATE SET email=EXCLUDED.email, display_name=EXCLUDED.display_name
+    `, [userId, displayName, email.toLowerCase()]);
+
+    const reg = await pool.query('SELECT * FROM registrations WHERE email=$1', [email.toLowerCase()]);
+    if (reg.rows[0]) {
+      await pool.query('UPDATE registrations SET line_user_id=$1 WHERE email=$2', [userId, email.toLowerCase()]);
+      // 發送歡迎 LINE 訊息
+      await sendLine(userId,
+        `AI 共學聚 綁定成功 🎉\n\n${reg.rows[0].name} 你好！\n活動前我們會透過 LINE 提醒你，5/4 見！🧬`
+      );
+      res.redirect('/?bound=success&name=' + encodeURIComponent(reg.rows[0].name));
+    } else {
+      res.redirect('/?bound=noReg');
+    }
+  } catch (err) {
+    console.error('[LINE Login Error]', err.message);
+    res.redirect('/?bound=fail');
+  }
+});
+
 // LINE Webhook
 const lineMiddleware = lineConfig.channelSecret
   ? line.middleware(lineConfig)
