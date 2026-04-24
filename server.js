@@ -205,7 +205,7 @@ app.post('/webhook', express.raw({ type: '*/*' }), lineMiddleware, async (req, r
     if (event.type === 'follow') {
       await lineClient.replyMessage(event.replyToken, {
         type: 'text',
-        text: `歡迎加入 AI 共學聚 🧬\n\n請傳送你報名時使用的 Email，我們就能在活動前自動通知你！`,
+        text: `歡迎加入 AI 共學聚 🧬\n\n請傳送你填寫報名表單時使用的 Email\n我們就能在活動前自動通知你！\n\n例如：yourname@gmail.com`,
       });
     }
     if (event.type === 'message' && event.message.type === 'text') {
@@ -223,9 +223,9 @@ app.post('/webhook', express.raw({ type: '*/*' }), lineMiddleware, async (req, r
         const reg = await pool.query('SELECT * FROM registrations WHERE email=$1', [email]);
         if (reg.rows[0]) {
           await pool.query('UPDATE registrations SET line_user_id=$1 WHERE email=$2', [userId, email]);
-          await lineClient.replyMessage(event.replyToken, { type: 'text', text: `綁定成功 🎉 ${reg.rows[0].name} 你好！\n活動前我們會透過 LINE 提醒你，5/4 見！` });
+          await lineClient.replyMessage(event.replyToken, { type: 'text', text: `AI 共學聚 綁定成功 🎉\n\n${reg.rows[0].name} 你好！\n活動前我們會透過 LINE 提醒你，5/4 見！🧬` });
         } else {
-          await lineClient.replyMessage(event.replyToken, { type: 'text', text: `Email 已記錄！\n請先完成網頁報名，我們就能在活動前通知你 📋` });
+          await lineClient.replyMessage(event.replyToken, { type: 'text', text: `AI 共學聚 📋\n\nEmail 已記錄！\n請先完成報名表單，填寫相同的 Email，我們就能在活動前通知你 🔔\n\n報名連結：https://ai-signup-backend.onrender.com` });
         }
       } else {
         await lineClient.replyMessage(event.replyToken, { type: 'text', text: `嗨！請傳送你報名時使用的 Email 給我\n\n例如：yourname@gmail.com` });
