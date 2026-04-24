@@ -90,6 +90,7 @@
                         <th>興趣領域</th>
                         <th>來源</th>
                         <th>報名時間</th>
+                        <th></th>
                     </tr>
                 </thead>
                 <tbody id="tableBody"></tbody>
@@ -194,8 +195,9 @@ function renderTable() {
             <td class="text-xs text-slate-400 max-w-[160px]">${formatTags(r.interests, 'purple')}</td>
             <td class="text-xs text-slate-500">${esc(r.source || '—')}</td>
             <td class="text-xs text-slate-500 whitespace-nowrap">${formatDate(r.created_at)}</td>
+            <td><button onclick="deleteReg(${r.id}, '${esc(r.name)}')" class="text-red-500 hover:text-red-400 text-xs px-2 py-1 rounded hover:bg-red-500/10 transition-all">刪除</button></td>
         </tr>
-    `).join('') || '<tr><td colspan="10" class="text-center text-slate-600 py-10">沒有符合的報名者</td></tr>';
+    `).join('') || '<tr><td colspan="11" class="text-center text-slate-600 py-10">沒有符合的報名者</td></tr>';
 }
 
 function filterTable() { renderTable(); }
@@ -263,6 +265,12 @@ function formatTags(str, color) {
 function formatDate(s) {
     if (!s) return '—';
     return new Date(s).toLocaleString('zh-TW', { month:'numeric', day:'numeric', hour:'2-digit', minute:'2-digit' });
+}
+
+async function deleteReg(id, name) {
+    if (!confirm(`確定要刪除「${name}」的報名資料？`)) return;
+    await fetch(`/admin/api/registrations/${id}?pw=${encodeURIComponent(adminPw)}`, { method: 'DELETE' });
+    loadData();
 }
 
 document.getElementById('pwInput')?.addEventListener('keydown', e => e.key === 'Enter' && login());

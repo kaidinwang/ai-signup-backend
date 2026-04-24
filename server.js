@@ -329,6 +329,11 @@ app.get('/admin/api/registrations', adminAuth, async (req, res) => {
   });
 });
 
+app.delete('/admin/api/registrations/:id', adminAuth, async (req, res) => {
+  await pool.query('DELETE FROM registrations WHERE id=$1', [req.params.id]);
+  res.json({ success: true });
+});
+
 app.post('/admin/api/send-reminder', adminAuth, async (req, res) => {
   await sendReminders(req.body.type || 'day');
   res.json({ success: true, message: '提醒已發送' });
