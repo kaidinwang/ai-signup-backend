@@ -64,6 +64,9 @@ const mailer = process.env.EMAIL_USER
   ? nodemailer.createTransport({
       service: 'gmail',
       auth: { user: process.env.EMAIL_USER, pass: process.env.EMAIL_APP_PASSWORD },
+      connectionTimeout: 5000,
+      greetingTimeout: 5000,
+      socketTimeout: 10000,
     })
   : null;
 
@@ -158,8 +161,11 @@ app.post('/register', async (req, res) => {
       await pool.query('UPDATE registrations SET line_user_id=$1 WHERE email=$2', [binding.rows[0].line_user_id, email]);
     }
 
+    res.json({ success: true, message: '報名成功！確認信已寄出' });
+
+    // 寄信與 LINE 通知背景執行，不阻塞回應
     const isGoing = attendance === 'Yes' || attendance === 'Maybe';
-    await sendEmail(
+    sendEmail(
       email,
       isGoing ? '✅ AI 共學聚 — 報名確認' : 'AI 共學聚 — 感謝填寫！',
       isGoing
@@ -168,11 +174,9 @@ app.post('/register', async (req, res) => {
     );
 
     if (binding.rows[0]?.line_user_id) {
-      await sendLine(binding.rows[0].line_user_id,
+      sendLine(binding.rows[0].line_user_id,
         `嗨 ${name}！報名成功 🎉\n\n📅 5/4（一）20:00–21:00\n活動前會再提醒你，到時見！🧬`);
     }
-
-    res.json({ success: true, message: '報名成功！確認信已寄出' });
   } catch (err) {
     console.error('[Register Error]', err.message);
     res.status(500).json({ success: false, message: '系統錯誤，請稍後再試' });
