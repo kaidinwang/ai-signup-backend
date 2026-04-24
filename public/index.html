@@ -347,6 +347,11 @@ document.getElementById('registerForm').addEventListener('submit', async functio
     btn.textContent = '送出中...';
     btn.disabled = true;
 
+    // 若超過 6 秒還沒回應，顯示等待提示
+    const slowTimer = setTimeout(() => {
+        btn.textContent = '連線中，請稍候...';
+    }, 6000);
+
     const formData = new FormData(this);
     const data = {};
     for (const [key, value] of formData.entries()) {
@@ -360,11 +365,15 @@ document.getElementById('registerForm').addEventListener('submit', async functio
     }
 
     try {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 60000);
         const res = await fetch(`${BACKEND}/register`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(data),
+            signal: controller.signal,
         });
+        clearTimeout(timeout);
         const result = await res.json();
         if (result.success) {
             const email = data.email || '';
@@ -377,9 +386,14 @@ document.getElementById('registerForm').addEventListener('submit', async functio
         } else {
             alert(result.message || '送出失敗，請再試一次');
         }
-    } catch {
-        alert('無法連線到伺服器，請確認後端是否已啟動');
+    } catch (err) {
+        if (err.name === 'AbortError') {
+            alert('伺服器回應超時，請再按一次送出');
+        } else {
+            alert('無法連線到伺服器，請稍後再試');
+        }
     } finally {
+        clearTimeout(slowTimer);
         btn.textContent = '確認報名 🚀';
         btn.disabled = false;
     }
