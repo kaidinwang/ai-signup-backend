@@ -319,6 +319,14 @@ app.post('/webhook', express.raw({ type: '*/*' }), lineMiddleware, async (req, r
       const userId = event.source.userId;
       const text = event.message.text.trim();
       const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+      // 檢查使用者是否已綁定報名
+      const alreadyBound = await pool.query('SELECT name FROM registrations WHERE line_user_id=$1 LIMIT 1', [userId]);
+      if (alreadyBound.rows[0]) {
+        // 已綁定者傳訊息：不主動回應，避免騷擾
+        continue;
+      }
+
       if (emailRe.test(text)) {
         const email = text.toLowerCase();
         let profile;
