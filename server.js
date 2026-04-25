@@ -320,10 +320,19 @@ app.post('/webhook', express.raw({ type: '*/*' }), lineMiddleware, async (req, r
   forwardToStockSystem(body);
   for (const event of body.events) {
     if (event.type === 'follow') {
-      await lineClient.replyMessage(event.replyToken, {
-        type: 'text',
-        text: `歡迎加入 AI 共學聚 🧬\n\n請傳送你填寫報名表單時使用的 Email\n我們就能在活動前自動通知你！\n\n例如：yourname@gmail.com`,
-      });
+      const userId = event.source.userId;
+      const reg = await pool.query('SELECT name FROM registrations WHERE line_user_id=$1', [userId]);
+      if (reg.rows[0]) {
+        await lineClient.replyMessage(event.replyToken, {
+          type: 'text',
+          text: `AI 共學聚 報名確認 🎉\n\n${reg.rows[0].name} 你好！\n你的報名已完成，活動前我們會在這裡提醒你，5/4 線上見！🧬`,
+        });
+      } else {
+        await lineClient.replyMessage(event.replyToken, {
+          type: 'text',
+          text: `歡迎加入 AI 共學聚 🧬\n\n請傳送你填寫報名表單時使用的 Email\n我們就能在活動前自動通知你！\n\n例如：yourname@gmail.com`,
+        });
+      }
     }
     if (event.type === 'message' && event.message.type === 'text') {
       const userId = event.source.userId;
