@@ -398,6 +398,7 @@ initDB().then(() => {
     console.log(`   Email: ${process.env.EMAIL_USER || '未設定'}`);
     console.log(`   LINE:  ${lineClient ? '已設定' : '未設定'}`);
     console.log(`   LINE Login Channel ID: ${process.env.LINE_LOGIN_CHANNEL_ID || '❌ 未設定'}`);
+    console.log(`   LINE Login Channel Secret: ${process.env.LINE_LOGIN_CHANNEL_SECRET ? '✅ 已設定' : '❌ 未設定'}`);
   });
 }).catch(err => {
   console.error('DB 連線失敗:', err.message);
