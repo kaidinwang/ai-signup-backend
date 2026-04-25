@@ -81,6 +81,14 @@ async function initDB() {
       created_at    TIMESTAMPTZ DEFAULT NOW()
     );
   `);
+  // 一次性修復：把所有 email 統一轉小寫，避免 LINE 綁定對不上
+  const fixed = await pool.query(`
+    UPDATE registrations SET email = LOWER(TRIM(email))
+    WHERE email <> LOWER(TRIM(email))
+    RETURNING email
+  `);
+  if (fixed.rowCount > 0) console.log(`[DB] Normalized ${fixed.rowCount} email(s) to lowercase`);
+  await pool.query(`UPDATE line_bindings SET email = LOWER(TRIM(email)) WHERE email <> LOWER(TRIM(email))`);
   console.log('DB ready');
 }
 
@@ -130,9 +138,9 @@ async function sendLine(userId, message) {
 
 // 即時檢查 email 是否已報名
 app.get('/check-email', async (req, res) => {
-  const { email } = req.query;
+  const email = (req.query.email || '').trim().toLowerCase();
   if (!email) return res.json({ registered: false });
-  const result = await pool.query('SELECT name, attendance FROM registrations WHERE email=$1', [email.toLowerCase()]);
+  const result = await pool.query('SELECT name, attendance FROM registrations WHERE email=$1', [email]);
   if (result.rows[0]) {
     const r = result.rows[0];
     res.json({ registered: true, name: r.name, attendance: r.attendance });
@@ -143,18 +151,19 @@ app.get('/check-email', async (req, res) => {
 
 app.post('/register', async (req, res) => {
   const {
-    name, email, attendance,
+    name, attendance,
     interest, tools, tools_other,
     level, job_type, source,
     want_to_learn, subscribe_line,
   } = req.body;
+  const email = (req.body.email || '').trim().toLowerCase();
 
   if (!name || !email) {
     return res.status(400).json({ success: false, message: '姓名和 Email 為必填' });
   }
 
   // 防呆：已報名直接回傳提示
-  const existing = await pool.query('SELECT name, attendance, line_user_id FROM registrations WHERE email=$1', [email.toLowerCase()]);
+  const existing = await pool.query('SELECT name, attendance, line_user_id FROM registrations WHERE email=$1', [email]);
   if (existing.rows[0]) {
     const reg = existing.rows[0];
     if (reg.line_user_id) {
