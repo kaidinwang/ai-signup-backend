@@ -443,7 +443,8 @@ if (bound === 'success') {
 } else if (bound === 'noReg') {
     alert('找不到對應的報名資料，請先完成報名表單');
 } else if (bound === 'fail') {
-    alert('LINE 綁定失敗，請稍後再試');
+    const reason = urlParams.get('reason');
+    alert('LINE 綁定失敗\n\n原因：' + (reason || '未知'));
 }
 </script>
 </body>

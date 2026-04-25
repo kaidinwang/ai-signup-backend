@@ -231,7 +231,6 @@ app.get('/line-login', (req, res) => {
   url.searchParams.set('redirect_uri', callbackUrl);
   url.searchParams.set('state', state);
   url.searchParams.set('scope', 'profile openid');
-  url.searchParams.set('bot_prompt', 'aggressive'); // 授權後同時提示加入 LINE@
   res.redirect(url.toString());
 });
 
@@ -254,7 +253,10 @@ app.get('/line-callback', async (req, res) => {
       client_secret: process.env.LINE_LOGIN_CHANNEL_SECRET,
     });
     console.log('[LINE Login] token response:', JSON.stringify(token));
-    if (!token.access_token) return res.redirect('/?bound=fail');
+    if (!token.access_token) {
+      const reason = encodeURIComponent(token.error_description || token.error || 'no token');
+      return res.redirect('/?bound=fail&reason=' + reason);
+    }
 
     // 取得 LINE 使用者資料
     const profile = await httpsGet('https://api.line.me/v2/profile', token.access_token);
@@ -280,7 +282,7 @@ app.get('/line-callback', async (req, res) => {
     }
   } catch (err) {
     console.error('[LINE Login Error]', err.message);
-    res.redirect('/?bound=fail');
+    res.redirect('/?bound=fail&reason=' + encodeURIComponent(err.message));
   }
 });
 
