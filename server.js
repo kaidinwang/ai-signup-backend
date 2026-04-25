@@ -240,6 +240,7 @@ app.get('/line-login', (req, res) => {
   url.searchParams.set('redirect_uri', callbackUrl);
   url.searchParams.set('state', state);
   url.searchParams.set('scope', 'profile openid');
+  url.searchParams.set('bot_prompt', 'aggressive');
   res.redirect(url.toString());
 });
 
