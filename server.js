@@ -344,7 +344,9 @@ app.post('/webhook', express.raw({ type: '*/*' }), lineMiddleware, async (req, r
 // Admin
 function adminAuth(req, res, next) {
   const pw = req.query.pw || req.headers['x-admin-password'];
-  if (pw !== process.env.ADMIN_PASSWORD) return res.status(401).json({ error: '密碼錯誤' });
+  const validPasswords = (process.env.ADMIN_PASSWORD || '')
+    .split(',').map(p => p.trim()).filter(Boolean);
+  if (!validPasswords.includes(pw)) return res.status(401).json({ error: '密碼錯誤' });
   next();
 }
 

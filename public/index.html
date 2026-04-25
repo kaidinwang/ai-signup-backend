@@ -224,6 +224,55 @@
         </div>
     </header>
 
+    <!-- 本月主題卡 -->
+    <section class="bg-white border border-slate-200/80 rounded-3xl p-7 md:p-9 shadow-[0_10px_30px_-10px_rgba(15,23,42,0.08)]">
+        <div class="text-center">
+            <div class="inline-block px-3 py-1 rounded-full bg-gradient-to-r from-blue-50 to-purple-50 border border-blue-100 text-xs font-semibold text-blue-700 mb-4 tracking-wide">
+                5/4 本月主題
+            </div>
+            <h2 class="display-font text-2xl md:text-3xl font-bold text-slate-900 mb-3 leading-snug">
+                [本月主題標題，例如：用 AI 打造自動化內容工作流]
+            </h2>
+            <p class="text-slate-600 text-[15px] md:text-base leading-relaxed max-w-lg mx-auto">
+                [一句話介紹這次要講什麼、可以帶走什麼]
+            </p>
+        </div>
+
+        <div class="mt-7 pt-6 border-t border-slate-100">
+            <div class="text-xs font-semibold text-slate-500 uppercase tracking-[0.15em] mb-4 text-center">本次課綱</div>
+            <ol class="space-y-3 max-w-lg mx-auto">
+                <li class="flex items-start gap-4">
+                    <span class="flex-shrink-0 w-7 h-7 rounded-full bg-slate-900 text-white text-xs font-bold flex items-center justify-center mt-0.5">1</span>
+                    <div>
+                        <div class="font-semibold text-slate-900 text-[15px]">[課綱主題一]</div>
+                        <div class="text-sm text-slate-500 mt-0.5">[補充說明，可省略]</div>
+                    </div>
+                </li>
+                <li class="flex items-start gap-4">
+                    <span class="flex-shrink-0 w-7 h-7 rounded-full bg-slate-900 text-white text-xs font-bold flex items-center justify-center mt-0.5">2</span>
+                    <div>
+                        <div class="font-semibold text-slate-900 text-[15px]">[課綱主題二]</div>
+                        <div class="text-sm text-slate-500 mt-0.5">[補充說明]</div>
+                    </div>
+                </li>
+                <li class="flex items-start gap-4">
+                    <span class="flex-shrink-0 w-7 h-7 rounded-full bg-slate-900 text-white text-xs font-bold flex items-center justify-center mt-0.5">3</span>
+                    <div>
+                        <div class="font-semibold text-slate-900 text-[15px]">[課綱主題三]</div>
+                        <div class="text-sm text-slate-500 mt-0.5">[補充說明]</div>
+                    </div>
+                </li>
+                <li class="flex items-start gap-4">
+                    <span class="flex-shrink-0 w-7 h-7 rounded-full bg-slate-900 text-white text-xs font-bold flex items-center justify-center mt-0.5">4</span>
+                    <div>
+                        <div class="font-semibold text-slate-900 text-[15px]">Q & A 自由交流</div>
+                        <div class="text-sm text-slate-500 mt-0.5">提問、討論、認識新朋友</div>
+                    </div>
+                </li>
+            </ol>
+        </div>
+    </section>
+
     <!-- Form Card (dark) -->
     <div class="form-card rounded-3xl overflow-hidden">
         <form id="registerForm" class="p-8 md:p-10 space-y-9">
@@ -456,28 +505,50 @@
         </form>
     </div>
 
-    <!-- Footer -->
-    <div class="footer-card rounded-2xl p-6">
-        <p class="text-center text-slate-400 text-xs mb-4 uppercase tracking-widest font-medium">主辦人</p>
-        <div class="grid grid-cols-2 gap-4">
-            <a href="https://www.facebook.com/dindin0702?locale=zh_TW" target="_blank" rel="noopener" class="flex items-center gap-3 p-3 rounded-xl bg-slate-50 border border-slate-200 hover:bg-blue-50 hover:border-blue-200 transition-all group">
-                <div class="w-10 h-10 rounded-full bg-blue-600/10 flex items-center justify-center flex-shrink-0">
-                    <i class="fab fa-facebook-f text-blue-600 text-sm"></i>
+    <!-- Speakers -->
+    <div class="footer-card rounded-3xl p-7 md:p-8">
+        <p class="text-center text-slate-400 text-xs mb-6 uppercase tracking-[0.18em] font-semibold">主講人</p>
+        <div class="grid md:grid-cols-2 gap-5">
+
+            <!-- Din Din -->
+            <div class="flex gap-4 p-4 rounded-2xl bg-slate-50/80 border border-slate-200/70">
+                <div class="relative w-16 h-16 flex-shrink-0">
+                    <img src="/dindin.jpg" alt="Din Din Wang"
+                         class="w-16 h-16 rounded-full object-cover"
+                         onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
+                    <div class="w-16 h-16 rounded-full bg-gradient-to-br from-blue-100 to-blue-200 hidden items-center justify-center text-blue-700 font-bold text-xl">DD</div>
                 </div>
-                <div>
-                    <div class="text-sm font-semibold text-slate-900 group-hover:text-blue-700 transition-colors">Din Din Wang</div>
-                    <div class="text-xs text-slate-500">Facebook</div>
+                <div class="flex-1 min-w-0">
+                    <div class="font-bold text-slate-900 text-[15px]">Din Din Wang</div>
+                    <p class="text-xs text-slate-500 leading-relaxed mt-1.5">
+                        [Din Din 簡介，例如：AI 應用愛好者，專注於用 AI 提升內容生產力]
+                    </p>
+                    <a href="https://www.facebook.com/dindin0702?locale=zh_TW" target="_blank" rel="noopener"
+                       class="inline-flex items-center gap-1.5 text-xs text-blue-600 hover:text-blue-700 font-medium mt-2.5 transition-colors">
+                        <i class="fab fa-facebook-f"></i> Facebook
+                    </a>
                 </div>
-            </a>
-            <a href="https://www.facebook.com/profile.php?id=61575277011688&locale=zh_TW" target="_blank" rel="noopener" class="flex items-center gap-3 p-3 rounded-xl bg-slate-50 border border-slate-200 hover:bg-blue-50 hover:border-blue-200 transition-all group">
-                <div class="w-10 h-10 rounded-full bg-blue-600/10 flex items-center justify-center flex-shrink-0">
-                    <i class="fab fa-facebook-f text-blue-600 text-sm"></i>
+            </div>
+
+            <!-- 阿邦老師 -->
+            <div class="flex gap-4 p-4 rounded-2xl bg-slate-50/80 border border-slate-200/70">
+                <div class="relative w-16 h-16 flex-shrink-0">
+                    <img src="/abang.jpg" alt="阿邦老師"
+                         class="w-16 h-16 rounded-full object-cover"
+                         onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
+                    <div class="w-16 h-16 rounded-full bg-gradient-to-br from-purple-100 to-purple-200 hidden items-center justify-center text-purple-700 font-bold text-xl">阿</div>
                 </div>
-                <div>
-                    <div class="text-sm font-semibold text-slate-900 group-hover:text-blue-700 transition-colors">阿邦老師</div>
-                    <div class="text-xs text-slate-500">Facebook</div>
+                <div class="flex-1 min-w-0">
+                    <div class="font-bold text-slate-900 text-[15px]">阿邦老師</div>
+                    <p class="text-xs text-slate-500 leading-relaxed mt-1.5">
+                        [阿邦老師簡介，例如：資深 AI 講師，深耕自動化與商業應用領域]
+                    </p>
+                    <a href="https://www.facebook.com/profile.php?id=61575277011688&locale=zh_TW" target="_blank" rel="noopener"
+                       class="inline-flex items-center gap-1.5 text-xs text-blue-600 hover:text-blue-700 font-medium mt-2.5 transition-colors">
+                        <i class="fab fa-facebook-f"></i> Facebook
+                    </a>
                 </div>
-            </a>
+            </div>
         </div>
     </div>
 
