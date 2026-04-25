@@ -3,79 +3,166 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI 共學聚 🧬 報名表單</title>
+    <title>AI 共學聚 報名表單</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;600;700&family=Inter:wght@400;600;700;800&display=swap');
         * { box-sizing: border-box; }
-        body { font-family: 'Noto Sans TC', sans-serif; background: #0f172a; color: #f8fafc; min-height: 100vh; }
-        .bg-animated {
-            background: radial-gradient(ellipse at 20% 50%, rgba(56,189,248,0.08) 0%, transparent 50%),
-                        radial-gradient(ellipse at 80% 20%, rgba(129,140,248,0.08) 0%, transparent 50%),
-                        radial-gradient(ellipse at 60% 80%, rgba(52,211,153,0.05) 0%, transparent 50%), #0f172a;
+        html, body { font-family: 'Noto Sans TC', 'Inter', sans-serif; }
+        body {
+            background:
+              radial-gradient(ellipse at 15% 0%, rgba(190,210,255,0.35) 0%, transparent 45%),
+              radial-gradient(ellipse at 85% 100%, rgba(220,200,255,0.3) 0%, transparent 45%),
+              #f5f4ef;
+            color: #1e293b;
+            min-height: 100vh;
         }
-        .glass-card { background: rgba(30,41,59,0.75); backdrop-filter: blur(16px); border: 1px solid rgba(255,255,255,0.08); }
-        .gradient-text { background: linear-gradient(90deg,#38bdf8,#818cf8,#34d399); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+        .display-font { font-family: 'Inter', 'Noto Sans TC', sans-serif; letter-spacing: -0.02em; }
+
+        /* Dark form card */
+        .form-card {
+            background: #0c1322;
+            color: #e2e8f0;
+            border: 1px solid rgba(255,255,255,0.06);
+            box-shadow: 0 30px 80px -20px rgba(15,23,42,0.25), 0 10px 30px -10px rgba(15,23,42,0.15);
+        }
+        .footer-card {
+            background: #ffffff;
+            border: 1px solid rgba(15,23,42,0.06);
+            box-shadow: 0 10px 30px -10px rgba(15,23,42,0.08);
+        }
+
+        /* Inputs (in dark card) */
         input[type="text"], input[type="email"], select, textarea {
-            background: rgba(15,23,42,0.7) !important; border: 1px solid rgba(255,255,255,0.1) !important;
-            color: white !important; transition: border-color 0.2s, box-shadow 0.2s;
+            background: rgba(255,255,255,0.04) !important;
+            border: 1px solid rgba(255,255,255,0.1) !important;
+            color: #f8fafc !important;
+            transition: border-color 0.2s, box-shadow 0.2s;
         }
         input[type="text"]:focus, input[type="email"]:focus, select:focus, textarea:focus {
-            outline: none; border-color: rgba(56,189,248,0.5) !important; box-shadow: 0 0 0 3px rgba(56,189,248,0.1);
+            outline: none;
+            border-color: rgba(125,170,255,0.6) !important;
+            box-shadow: 0 0 0 3px rgba(125,170,255,0.12);
         }
         input::placeholder, textarea::placeholder { color: rgba(148,163,184,0.5); }
-        select option { background: #1e293b; color: white; }
-        .interest-label {
-            display: flex; align-items: flex-start; gap: 10px; padding: 10px 14px;
-            border-radius: 10px; border: 1px solid rgba(255,255,255,0.06);
-            background: rgba(15,23,42,0.4); cursor: pointer; transition: all 0.2s;
+        select option { background: #0c1322; color: #f8fafc; }
+
+        /* Section title */
+        .section-label {
+            font-size: 11px; font-weight: 600; text-transform: uppercase;
+            letter-spacing: 0.12em; color: #94a3b8; margin-bottom: 4px;
         }
-        .interest-label:hover { border-color: rgba(56,189,248,0.3); background: rgba(56,189,248,0.05); }
-        .interest-label input[type="checkbox"] { accent-color: #38bdf8; width: 16px; height: 16px; margin-top: 2px; flex-shrink: 0; }
-        .tool-label {
-            display: flex; align-items: center; gap: 8px; padding: 8px 12px;
-            border-radius: 10px; border: 1px solid rgba(255,255,255,0.06);
-            background: rgba(15,23,42,0.4); cursor: pointer; transition: all 0.2s; font-size: 13px;
+        .section-heading {
+            font-size: 16px; font-weight: 600; color: #f8fafc;
+            display: flex; align-items: center; gap: 8px;
         }
-        .tool-label:hover { border-color: rgba(52,211,153,0.3); background: rgba(52,211,153,0.05); }
-        .tool-label input[type="checkbox"] { accent-color: #34d399; width: 14px; height: 14px; flex-shrink: 0; }
+        .section-heading .req { color: #f87171; font-weight: 400; font-size: 14px; }
+        .section-help { font-size: 12px; color: #64748b; margin-top: 2px; }
+
+        /* Compact chip-style multi-select */
+        .chip-group { display: flex; flex-wrap: wrap; gap: 6px; }
+        .chip {
+            position: relative; cursor: pointer; user-select: none;
+            font-size: 13px; line-height: 1;
+            padding: 8px 14px; border-radius: 999px;
+            background: rgba(255,255,255,0.04);
+            border: 1px solid rgba(255,255,255,0.1);
+            color: #cbd5e1;
+            transition: all 0.15s ease;
+        }
+        .chip:hover { border-color: rgba(125,170,255,0.4); color: #f8fafc; }
+        .chip input { position: absolute; opacity: 0; pointer-events: none; }
+        .chip:has(input:checked) {
+            background: linear-gradient(135deg, rgba(96,165,250,0.18), rgba(167,139,250,0.18));
+            border-color: rgba(125,170,255,0.6);
+            color: #ffffff;
+        }
+        .chip:has(input:checked)::before {
+            content: '\2713'; margin-right: 6px; font-weight: 700; color: #93c5fd;
+        }
+        .chip-category {
+            font-size: 11px; color: #64748b; font-weight: 500;
+            margin: 14px 0 8px 0; letter-spacing: 0.05em;
+        }
+        .chip-category:first-child { margin-top: 0; }
+
+        /* Interest cards (denser) */
+        .interest-card {
+            display: flex; align-items: center; gap: 12px;
+            padding: 10px 14px; border-radius: 10px;
+            background: rgba(255,255,255,0.03);
+            border: 1px solid rgba(255,255,255,0.08);
+            cursor: pointer; transition: all 0.15s;
+        }
+        .interest-card:hover { border-color: rgba(125,170,255,0.4); background: rgba(125,170,255,0.05); }
+        .interest-card input { accent-color: #60a5fa; width: 16px; height: 16px; flex-shrink: 0; }
+        .interest-card:has(input:checked) {
+            background: linear-gradient(135deg, rgba(96,165,250,0.12), rgba(167,139,250,0.12));
+            border-color: rgba(125,170,255,0.5);
+        }
+        .interest-card .ic-title { font-size: 14px; font-weight: 500; color: #f1f5f9; }
+        .interest-card .ic-desc { font-size: 11.5px; color: #64748b; margin-top: 1px; }
+
+        /* Radio cards */
         .radio-card {
             display: flex; align-items: flex-start; gap: 12px; padding: 14px 16px;
             border-radius: 12px; border: 1px solid rgba(255,255,255,0.08);
-            background: rgba(15,23,42,0.4); cursor: pointer; transition: all 0.2s;
+            background: rgba(255,255,255,0.03); cursor: pointer; transition: all 0.15s;
         }
-        .radio-card:hover { border-color: rgba(56,189,248,0.3); background: rgba(56,189,248,0.05); }
-        .radio-card input[type="radio"] { accent-color: #38bdf8; width: 16px; height: 16px; margin-top: 2px; flex-shrink: 0; }
+        .radio-card:hover { border-color: rgba(125,170,255,0.4); background: rgba(125,170,255,0.05); }
+        .radio-card input[type="radio"] { accent-color: #60a5fa; width: 16px; height: 16px; margin-top: 2px; flex-shrink: 0; }
+        .radio-card:has(input:checked) {
+            background: linear-gradient(135deg, rgba(96,165,250,0.12), rgba(167,139,250,0.12));
+            border-color: rgba(125,170,255,0.6);
+        }
+
+        /* Level cards */
         .level-card {
-            display: flex; flex-direction: column; align-items: center; gap: 6px;
-            padding: 14px 10px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.08);
-            background: rgba(15,23,42,0.4); cursor: pointer; transition: all 0.2s; text-align: center;
+            display: flex; flex-direction: column; align-items: center; gap: 8px;
+            padding: 16px 8px; border-radius: 12px;
+            border: 1px solid rgba(255,255,255,0.08);
+            background: rgba(255,255,255,0.03); cursor: pointer; transition: all 0.15s; text-align: center;
         }
-        .level-card:hover { border-color: rgba(129,140,248,0.4); background: rgba(129,140,248,0.07); }
-        .level-card input[type="radio"] { accent-color: #818cf8; }
-        .submit-btn { background: linear-gradient(135deg,#2563eb,#7c3aed); transition: all 0.3s; }
-        .submit-btn:hover { transform: translateY(-1px); box-shadow: 0 8px 25px rgba(124,58,237,0.4); }
-        .section-title { font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; color: #94a3b8; margin-bottom: 12px; display: flex; align-items: center; gap: 8px; }
-        .line-box { background: rgba(0,185,0,0.08); border: 1px solid rgba(0,185,0,0.2); border-radius: 14px; padding: 18px; }
-        .success-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.8); z-index: 100; align-items: center; justify-content: center; }
+        .level-card:hover { border-color: rgba(167,139,250,0.5); background: rgba(167,139,250,0.06); }
+        .level-card input[type="radio"] { display: none; }
+        .level-card:has(input:checked) {
+            background: linear-gradient(135deg, rgba(167,139,250,0.15), rgba(96,165,250,0.15));
+            border-color: rgba(167,139,250,0.6);
+        }
+
+        .submit-btn {
+            background: linear-gradient(135deg, #1e40af, #6d28d9);
+            transition: all 0.25s;
+        }
+        .submit-btn:hover { transform: translateY(-1px); box-shadow: 0 12px 30px rgba(109,40,217,0.35); }
+        .submit-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; box-shadow: none; }
+
+        .line-box {
+            background: rgba(0,185,0,0.06);
+            border: 1px solid rgba(0,185,0,0.2);
+            border-radius: 14px; padding: 18px;
+        }
+
+        /* Modals */
+        .success-overlay { display: none; position: fixed; inset: 0; background: rgba(15,23,42,0.7); backdrop-filter: blur(4px); z-index: 100; align-items: center; justify-content: center; }
         .success-overlay.show { display: flex; }
+        .modal-card { background: #0c1322; color: #e2e8f0; border: 1px solid rgba(255,255,255,0.08); }
     </style>
 </head>
-<body class="bg-animated p-4 py-10 flex items-start justify-center">
+<body class="p-4 py-12 flex items-start justify-center">
 
 <!-- Success Modal -->
 <div class="success-overlay" id="successOverlay">
-    <div class="glass-card rounded-3xl p-8 text-center max-w-sm mx-4 space-y-4">
-        <div class="text-6xl">🎉</div>
-        <h2 class="text-2xl font-bold gradient-text">報名成功！</h2>
-        <p class="text-slate-400 text-sm">確認信已寄出，5/4 見！</p>
+    <div class="modal-card rounded-3xl p-8 text-center max-w-sm mx-4 space-y-4">
+        <div class="text-5xl">🎉</div>
+        <h2 class="text-2xl font-bold display-font">報名成功</h2>
+        <p class="text-slate-400 text-sm">確認信已寄出，5/4 見</p>
 
-        <!-- LINE 綁定區塊 -->
         <div class="bg-green-500/10 border border-green-500/20 rounded-2xl p-4 text-left space-y-3">
-            <p class="text-green-300 font-semibold text-sm text-center">📲 綁定 LINE 帳號，自動接收提醒</p>
-            <p class="text-slate-400 text-xs text-center">點下方按鈕，用 LINE 授權即可完成綁定<br>活動前 24 小時 + 30 分鐘自動通知你</p>
-            <a id="lineBindBtn" href="#" target="_blank"
+            <p class="text-green-300 font-semibold text-sm text-center">綁定 LINE，自動接收提醒</p>
+            <p class="text-slate-400 text-xs text-center">活動前 24 小時 + 30 分鐘自動通知你</p>
+            <a id="lineBindBtn" href="#"
                class="flex items-center justify-center gap-2 w-full py-3 rounded-xl font-bold text-white text-sm"
                style="background:#00B900;">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="white"><path d="M19.365 9.89c.50 0 .906.41.906.91s-.406.91-.906.91H17.87v1.04h1.495c.50 0 .906.41.906.91s-.406.91-.906.91H16.96a.91.91 0 0 1-.906-.91V9.89c0-.50.406-.91.906-.91h2.405zm-5.23 3.77c.30.42.19.99-.24 1.28a.91.91 0 0 1-1.27-.24l-1.96-2.77v2.1c0 .50-.41.91-.91.91s-.91-.41-.91-.91V9.89c0-.40.26-.76.64-.88.38-.12.80 0 1.03.31l1.96 2.77V9.89c0-.50.41-.91.91-.91s.91.41.91.91v3.77zm-6.14.91c0 .50-.41.91-.91.91s-.91-.41-.91-.91V9.89c0-.50.41-.91.91-.91s.91.41.91.91v3.77zM5.14 8.98H3.64c-.50 0-.906-.41-.906-.91s.406-.91.906-.91H5.14c.50 0 .906.41.906.91v3.77c0 .50-.406.91-.906.91s-.906-.41-.906-.91V8.98zM12 0C5.373 0 0 4.97 0 11.09c0 5.49 4.375 10.08 10.285 10.94.40.087.946.267 1.085.61.124.31.081.80.04 1.115l-.175 1.065c-.053.31-.245 1.215 1.065.663 1.31-.553 7.065-4.161 9.635-7.125C23.535 16.37 24 13.8 24 11.09 24 4.97 18.627 0 12 0z"/></svg>
@@ -91,149 +178,204 @@
 
 <!-- LINE 綁定成功 Modal -->
 <div class="success-overlay" id="boundOverlay">
-    <div class="glass-card rounded-3xl p-8 text-center max-w-sm mx-4 space-y-4">
-        <div class="text-6xl">🧬</div>
-        <h2 class="text-2xl font-bold gradient-text">LINE 綁定成功！</h2>
-        <p class="text-slate-400 text-sm" id="boundMsg">活動前會透過 LINE 通知你，5/4 見！</p>
+    <div class="modal-card rounded-3xl p-8 text-center max-w-sm mx-4 space-y-4">
+        <div class="text-5xl">✓</div>
+        <h2 class="text-2xl font-bold display-font">LINE 綁定成功</h2>
+        <p class="text-slate-400 text-sm" id="boundMsg">活動前會透過 LINE 通知你，5/4 見</p>
         <button onclick="document.getElementById('boundOverlay').classList.remove('show')" class="w-full px-6 py-2 bg-green-600 hover:bg-green-500 rounded-xl text-sm font-medium transition-all">
-            太好了！
+            太好了
         </button>
     </div>
 </div>
 
-<div class="max-w-2xl w-full">
-    <div class="glass-card rounded-3xl shadow-2xl overflow-hidden">
+<div class="max-w-2xl w-full space-y-6">
 
-        <!-- Header -->
-        <div class="p-8 text-center" style="background: linear-gradient(135deg, rgba(37,99,235,0.15), rgba(124,58,237,0.15)); border-bottom: 1px solid rgba(255,255,255,0.08);">
-            <div class="text-5xl mb-3">🧬</div>
-            <h1 class="text-3xl font-bold mb-2 gradient-text">AI 共學聚 報名表單</h1>
-            <div class="flex items-center justify-center gap-5 mt-4 text-slate-400 text-sm flex-wrap gap-y-2">
-                <span class="flex items-center gap-1.5"><i class="fas fa-calendar-alt text-blue-400"></i> 5/4（一）</span>
-                <span class="flex items-center gap-1.5"><i class="fas fa-clock text-purple-400"></i> 20:00 – 21:00</span>
-                <span class="flex items-center gap-1.5"><i class="fas fa-video text-emerald-400"></i> 線上直播</span>
-            </div>
-            <p class="text-slate-500 text-xs mt-3">每月第一個週一，和我們一起共學進化</p>
+    <!-- Header (light) -->
+    <header class="text-center pt-4 pb-2">
+        <div class="inline-block px-4 py-1 rounded-full bg-white/60 border border-slate-200/80 text-xs font-medium text-slate-600 mb-5 backdrop-blur">
+            AI 共學聚 · 月度線上聚會
         </div>
+        <h1 class="display-font text-5xl md:text-6xl font-extrabold text-slate-900 leading-tight mb-4">
+            一起共學，<br class="md:hidden">與 AI 同進化
+        </h1>
+        <p class="text-slate-600 text-base md:text-lg leading-relaxed max-w-lg mx-auto mb-7">
+            每月第一個週一晚上，和一群熱愛 AI 的人一起聊工具、聊應用、聊未來。
+        </p>
+        <div class="inline-flex items-center gap-6 px-6 py-4 rounded-2xl bg-white/70 border border-slate-200/80 backdrop-blur">
+            <div>
+                <div class="text-xs text-slate-500 mb-1">日期</div>
+                <div class="display-font text-2xl font-bold text-slate-900">5/4 <span class="text-base font-medium text-slate-500">(週一)</span></div>
+            </div>
+            <div class="w-px h-10 bg-slate-200"></div>
+            <div>
+                <div class="text-xs text-slate-500 mb-1">時間</div>
+                <div class="display-font text-2xl font-bold text-slate-900">20:00<span class="text-base font-medium text-slate-500"> – 21:00</span></div>
+            </div>
+            <div class="w-px h-10 bg-slate-200 hidden sm:block"></div>
+            <div class="hidden sm:block">
+                <div class="text-xs text-slate-500 mb-1">形式</div>
+                <div class="display-font text-2xl font-bold text-slate-900">線上</div>
+            </div>
+        </div>
+    </header>
 
-        <form id="registerForm" class="p-8 space-y-7">
+    <!-- Form Card (dark) -->
+    <div class="form-card rounded-3xl overflow-hidden">
+        <form id="registerForm" class="p-8 md:p-10 space-y-9">
 
             <!-- 姓名 -->
             <div class="space-y-2">
-                <div class="section-title"><i class="fas fa-user text-blue-400"></i> 姓名 / 稱呼 <span class="text-red-400">*</span></div>
-                <input type="text" name="name" required placeholder="你的名字或暱稱" class="w-full p-3.5 rounded-xl text-sm">
+                <div class="section-label">基本資料</div>
+                <div class="section-heading">姓名 / 稱呼 <span class="req">必填</span></div>
+                <input type="text" name="name" required placeholder="你的名字或暱稱" class="w-full p-3.5 rounded-xl text-sm mt-2">
             </div>
 
             <!-- Email -->
             <div class="space-y-2">
-                <div class="section-title"><i class="fas fa-envelope text-blue-400"></i> 聯絡 Email <span class="text-red-400">*</span></div>
-                <input type="email" name="email" id="emailInput" required placeholder="your@email.com" class="w-full p-3.5 rounded-xl text-sm">
-                <p class="text-xs text-slate-500 pl-1">活動資訊與提醒通知將寄送至此信箱</p>
+                <div class="section-heading">聯絡 Email <span class="req">必填</span></div>
+                <input type="email" name="email" id="emailInput" required placeholder="your@email.com" class="w-full p-3.5 rounded-xl text-sm mt-2">
+                <p class="section-help">活動資訊與提醒通知將寄送至此信箱</p>
                 <div id="emailAlert" class="hidden rounded-xl p-4 border text-sm"></div>
             </div>
 
             <!-- 出席確認 -->
             <div class="space-y-3">
-                <div class="section-title"><i class="fas fa-calendar-check text-emerald-400"></i> 出席確認 <span class="text-red-400">*</span></div>
-                <div class="space-y-2">
+                <div class="section-label">出席</div>
+                <div class="section-heading">5/4 晚上你能參加嗎？ <span class="req">必填</span></div>
+                <div class="space-y-2 pt-2">
                     <label class="radio-card">
                         <input type="radio" name="attendance" value="Yes" required>
-                        <div><div class="text-sm font-medium text-emerald-300">✅ 我確認 5/4 晚上 20:00 可以參加</div><div class="text-xs text-slate-500 mt-0.5">已排定時間，到時見！</div></div>
+                        <div><div class="text-sm font-medium text-emerald-300">確認參加</div><div class="text-xs text-slate-500 mt-0.5">已排定時間，到時見</div></div>
                     </label>
                     <label class="radio-card">
                         <input type="radio" name="attendance" value="Maybe">
-                        <div><div class="text-sm font-medium text-yellow-300">🤔 還不確定，但很感興趣</div><div class="text-xs text-slate-500 mt-0.5">請保留一個位置給我</div></div>
+                        <div><div class="text-sm font-medium text-amber-300">不確定，但很感興趣</div><div class="text-xs text-slate-500 mt-0.5">請保留一個位置給我</div></div>
                     </label>
                     <label class="radio-card">
                         <input type="radio" name="attendance" value="No">
-                        <div><div class="text-sm font-medium text-slate-400">❌ 當天無法參加</div><div class="text-xs text-slate-500 mt-0.5">但請通知我下次活動</div></div>
+                        <div><div class="text-sm font-medium text-slate-300">當天無法</div><div class="text-xs text-slate-500 mt-0.5">但請通知我下次活動</div></div>
                     </label>
                 </div>
             </div>
 
-            <!-- AI 工具 -->
+            <!-- AI 工具（chip-style）-->
             <div class="space-y-3">
-                <div class="section-title"><i class="fas fa-tools text-emerald-400"></i> 你有在用哪些 AI 工具？<span class="text-slate-500 font-normal normal-case tracking-normal text-xs ml-1">（可複選）</span></div>
-                <div class="text-xs text-slate-500 pl-1 mb-2">🤖 AI 聊天 & 助理</div>
-                <div class="grid grid-cols-2 gap-2">
-                    <label class="tool-label"><input type="checkbox" name="tools[]" value="ChatGPT"> <span>💬 ChatGPT</span></label>
-                    <label class="tool-label"><input type="checkbox" name="tools[]" value="Claude"> <span>🤖 Claude</span></label>
-                    <label class="tool-label"><input type="checkbox" name="tools[]" value="Gemini"> <span>✨ Gemini</span></label>
-                    <label class="tool-label"><input type="checkbox" name="tools[]" value="Grok"> <span>🌀 Grok</span></label>
-                    <label class="tool-label"><input type="checkbox" name="tools[]" value="Perplexity"> <span>🔍 Perplexity</span></label>
-                    <label class="tool-label"><input type="checkbox" name="tools[]" value="Copilot"> <span>🪟 Copilot</span></label>
+                <div class="section-label">使用習慣</div>
+                <div class="section-heading">你有在用哪些 AI 工具？</div>
+                <p class="section-help">可複選，沒有也沒關係</p>
+
+                <div class="pt-3">
+                    <div class="chip-category">AI 聊天 & 助理</div>
+                    <div class="chip-group">
+                        <label class="chip"><input type="checkbox" name="tools[]" value="ChatGPT">ChatGPT</label>
+                        <label class="chip"><input type="checkbox" name="tools[]" value="Claude">Claude</label>
+                        <label class="chip"><input type="checkbox" name="tools[]" value="Gemini">Gemini</label>
+                        <label class="chip"><input type="checkbox" name="tools[]" value="Grok">Grok</label>
+                        <label class="chip"><input type="checkbox" name="tools[]" value="Perplexity">Perplexity</label>
+                        <label class="chip"><input type="checkbox" name="tools[]" value="Copilot">Copilot</label>
+                    </div>
+
+                    <div class="chip-category">圖像 & 影片</div>
+                    <div class="chip-group">
+                        <label class="chip"><input type="checkbox" name="tools[]" value="Midjourney">Midjourney</label>
+                        <label class="chip"><input type="checkbox" name="tools[]" value="DALL-E">DALL-E</label>
+                        <label class="chip"><input type="checkbox" name="tools[]" value="Runway">Runway</label>
+                        <label class="chip"><input type="checkbox" name="tools[]" value="Sora">Sora</label>
+                        <label class="chip"><input type="checkbox" name="tools[]" value="Canva AI">Canva AI</label>
+                        <label class="chip"><input type="checkbox" name="tools[]" value="Pika">Pika</label>
+                    </div>
+
+                    <div class="chip-category">自動化 & 開發</div>
+                    <div class="chip-group">
+                        <label class="chip"><input type="checkbox" name="tools[]" value="Make">Make</label>
+                        <label class="chip"><input type="checkbox" name="tools[]" value="n8n">n8n</label>
+                        <label class="chip"><input type="checkbox" name="tools[]" value="Cursor">Cursor</label>
+                        <label class="chip"><input type="checkbox" name="tools[]" value="Notion AI">Notion AI</label>
+                        <label class="chip"><input type="checkbox" name="tools[]" value="ElevenLabs">ElevenLabs</label>
+                        <label class="chip"><input type="checkbox" name="tools[]" value="Suno">Suno</label>
+                    </div>
                 </div>
-                <div class="text-xs text-slate-500 pl-1 mt-3 mb-2">🎨 圖像 & 影片</div>
-                <div class="grid grid-cols-2 gap-2">
-                    <label class="tool-label"><input type="checkbox" name="tools[]" value="Midjourney"> <span>🖼️ Midjourney</span></label>
-                    <label class="tool-label"><input type="checkbox" name="tools[]" value="DALL-E"> <span>🎨 DALL-E</span></label>
-                    <label class="tool-label"><input type="checkbox" name="tools[]" value="Runway"> <span>🎬 Runway</span></label>
-                    <label class="tool-label"><input type="checkbox" name="tools[]" value="Sora"> <span>🎥 Sora</span></label>
-                    <label class="tool-label"><input type="checkbox" name="tools[]" value="Canva AI"> <span>🖌️ Canva AI</span></label>
-                    <label class="tool-label"><input type="checkbox" name="tools[]" value="Pika"> <span>⚡ Pika</span></label>
-                </div>
-                <div class="text-xs text-slate-500 pl-1 mt-3 mb-2">⚙️ 自動化 & 開發</div>
-                <div class="grid grid-cols-2 gap-2">
-                    <label class="tool-label"><input type="checkbox" name="tools[]" value="Make"> <span>🔗 Make (Integromat)</span></label>
-                    <label class="tool-label"><input type="checkbox" name="tools[]" value="n8n"> <span>⚡ n8n</span></label>
-                    <label class="tool-label"><input type="checkbox" name="tools[]" value="Cursor"> <span>💻 Cursor</span></label>
-                    <label class="tool-label"><input type="checkbox" name="tools[]" value="Notion AI"> <span>📝 Notion AI</span></label>
-                    <label class="tool-label"><input type="checkbox" name="tools[]" value="ElevenLabs"> <span>🎙️ ElevenLabs</span></label>
-                    <label class="tool-label"><input type="checkbox" name="tools[]" value="Suno"> <span>🎵 Suno</span></label>
-                </div>
-                <div class="mt-2">
-                    <input type="text" name="tools_other" placeholder="其他工具（請填寫）" class="w-full p-3 rounded-xl text-sm">
-                </div>
+
+                <input type="text" name="tools_other" placeholder="其他工具（自由填寫）" class="w-full p-3 rounded-xl text-sm mt-3">
             </div>
 
             <!-- 興趣領域 -->
             <div class="space-y-3">
-                <div class="section-title"><i class="fas fa-brain text-purple-400"></i> 你最想深入的 AI 領域？<span class="text-slate-500 font-normal normal-case tracking-normal text-xs ml-1">（可複選）</span></div>
-                <div class="space-y-2 text-sm">
-                    <div class="text-xs text-slate-500 pl-1 mb-1">📢 行銷 & 內容</div>
-                    <label class="interest-label"><input type="checkbox" name="interest[]" value="社群行銷自動化"><div><div class="font-medium">社群行銷自動化</div><div class="text-xs text-slate-500">IG / Threads / Facebook 內容生成與排程</div></div></label>
-                    <label class="interest-label"><input type="checkbox" name="interest[]" value="AIO/GEO搜尋優化"><div><div class="font-medium">AIO / GEO 搜尋優化</div><div class="text-xs text-slate-500">讓 AI 搜尋引擎主動推薦你的內容</div></div></label>
-                    <label class="interest-label"><input type="checkbox" name="interest[]" value="文字生成與寫作"><div><div class="font-medium">文字生成與寫作</div><div class="text-xs text-slate-500">爆文寫作、文案優化、長文生成</div></div></label>
-                    <div class="text-xs text-slate-500 pl-1 mt-3 mb-1">⚙️ 自動化 & 工作流</div>
-                    <label class="interest-label"><input type="checkbox" name="interest[]" value="AI Agent工作流"><div><div class="font-medium">AI Agent 工作流</div><div class="text-xs text-slate-500">讓 AI 自動完成多步驟複雜任務</div></div></label>
-                    <label class="interest-label"><input type="checkbox" name="interest[]" value="商業流程自動化"><div><div class="font-medium">商業流程自動化</div><div class="text-xs text-slate-500">Make / n8n / Zapier 串接 AI</div></div></label>
-                    <label class="interest-label"><input type="checkbox" name="interest[]" value="Prompt Engineering"><div><div class="font-medium">Prompt Engineering</div><div class="text-xs text-slate-500">寫出讓 AI 精準輸出的提示詞技巧</div></div></label>
-                    <div class="text-xs text-slate-500 pl-1 mt-3 mb-1">🛠️ 工具 & 開發</div>
-                    <label class="interest-label"><input type="checkbox" name="interest[]" value="AI圖像影片生成"><div><div class="font-medium">AI 圖像 / 影片生成</div><div class="text-xs text-slate-500">Midjourney、Sora、Runway 等創意工具</div></div></label>
-                    <label class="interest-label"><input type="checkbox" name="interest[]" value="AI程式開發輔助"><div><div class="font-medium">AI 程式開發輔助</div><div class="text-xs text-slate-500">Claude Code、Cursor、GitHub Copilot</div></div></label>
-                    <label class="interest-label"><input type="checkbox" name="interest[]" value="資料分析與洞察"><div><div class="font-medium">資料分析與洞察</div><div class="text-xs text-slate-500">用 AI 分析數據、產出商業洞察</div></div></label>
-                    <label class="interest-label"><input type="checkbox" name="interest[]" value="AI工具選品評測"><div><div class="font-medium">AI 工具選品與評測</div><div class="text-xs text-slate-500">哪些工具值得用？怎麼選最適合的？</div></div></label>
+                <div class="section-heading">你最想深入哪些 AI 領域？</div>
+                <p class="section-help">可複選，幫助我們安排內容方向</p>
+                <div class="space-y-1.5 pt-2">
+                    <label class="interest-card">
+                        <input type="checkbox" name="interest[]" value="社群行銷自動化">
+                        <div><div class="ic-title">社群行銷自動化</div><div class="ic-desc">IG / Threads / Facebook 內容生成與排程</div></div>
+                    </label>
+                    <label class="interest-card">
+                        <input type="checkbox" name="interest[]" value="AIO/GEO搜尋優化">
+                        <div><div class="ic-title">AIO / GEO 搜尋優化</div><div class="ic-desc">讓 AI 搜尋引擎主動推薦你的內容</div></div>
+                    </label>
+                    <label class="interest-card">
+                        <input type="checkbox" name="interest[]" value="文字生成與寫作">
+                        <div><div class="ic-title">文字生成與寫作</div><div class="ic-desc">爆文寫作、文案優化、長文生成</div></div>
+                    </label>
+                    <label class="interest-card">
+                        <input type="checkbox" name="interest[]" value="AI Agent工作流">
+                        <div><div class="ic-title">AI Agent 工作流</div><div class="ic-desc">讓 AI 自動完成多步驟複雜任務</div></div>
+                    </label>
+                    <label class="interest-card">
+                        <input type="checkbox" name="interest[]" value="商業流程自動化">
+                        <div><div class="ic-title">商業流程自動化</div><div class="ic-desc">Make / n8n / Zapier 串接 AI</div></div>
+                    </label>
+                    <label class="interest-card">
+                        <input type="checkbox" name="interest[]" value="Prompt Engineering">
+                        <div><div class="ic-title">Prompt Engineering</div><div class="ic-desc">寫出讓 AI 精準輸出的提示詞技巧</div></div>
+                    </label>
+                    <label class="interest-card">
+                        <input type="checkbox" name="interest[]" value="AI圖像影片生成">
+                        <div><div class="ic-title">AI 圖像 / 影片生成</div><div class="ic-desc">Midjourney、Sora、Runway 等創意工具</div></div>
+                    </label>
+                    <label class="interest-card">
+                        <input type="checkbox" name="interest[]" value="AI程式開發輔助">
+                        <div><div class="ic-title">AI 程式開發輔助</div><div class="ic-desc">Claude Code、Cursor、GitHub Copilot</div></div>
+                    </label>
+                    <label class="interest-card">
+                        <input type="checkbox" name="interest[]" value="資料分析與洞察">
+                        <div><div class="ic-title">資料分析與洞察</div><div class="ic-desc">用 AI 分析數據、產出商業洞察</div></div>
+                    </label>
+                    <label class="interest-card">
+                        <input type="checkbox" name="interest[]" value="AI工具選品評測">
+                        <div><div class="ic-title">AI 工具選品與評測</div><div class="ic-desc">哪些工具值得用？怎麼選最適合的？</div></div>
+                    </label>
                 </div>
             </div>
 
             <!-- AI 程度 -->
             <div class="space-y-3">
-                <div class="section-title"><i class="fas fa-signal text-yellow-400"></i> 你目前的 AI 使用程度？</div>
-                <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                    <label class="level-card"><input type="radio" name="level" value="新手探索中"><span class="text-2xl">🌱</span><span class="text-sm font-medium">新手探索中</span><span class="text-xs text-slate-500 text-center">剛開始認識 AI</span></label>
-                    <label class="level-card"><input type="radio" name="level" value="日常使用中"><span class="text-2xl">🔥</span><span class="text-sm font-medium">日常使用中</span><span class="text-xs text-slate-500 text-center">每天都在用 AI</span></label>
-                    <label class="level-card"><input type="radio" name="level" value="進階實踐者"><span class="text-2xl">⚡</span><span class="text-sm font-medium">進階實踐者</span><span class="text-xs text-slate-500 text-center">已建立自動化流程</span></label>
-                    <label class="level-card"><input type="radio" name="level" value="AI專家達人"><span class="text-2xl">🚀</span><span class="text-sm font-medium">AI 專家達人</span><span class="text-xs text-slate-500 text-center">在開發 / 教學 AI</span></label>
+                <div class="section-heading">你目前的 AI 使用程度？</div>
+                <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-2">
+                    <label class="level-card"><input type="radio" name="level" value="新手探索中"><span class="text-sm font-semibold text-slate-100">新手探索中</span><span class="text-xs text-slate-500">剛開始認識 AI</span></label>
+                    <label class="level-card"><input type="radio" name="level" value="日常使用中"><span class="text-sm font-semibold text-slate-100">日常使用中</span><span class="text-xs text-slate-500">每天都在用 AI</span></label>
+                    <label class="level-card"><input type="radio" name="level" value="進階實踐者"><span class="text-sm font-semibold text-slate-100">進階實踐者</span><span class="text-xs text-slate-500">已建立自動化流程</span></label>
+                    <label class="level-card"><input type="radio" name="level" value="AI專家達人"><span class="text-sm font-semibold text-slate-100">AI 專家達人</span><span class="text-xs text-slate-500">在開發 / 教學 AI</span></label>
                 </div>
             </div>
 
             <!-- 想學什麼 -->
             <div class="space-y-2">
-                <div class="section-title"><i class="fas fa-lightbulb text-yellow-400"></i> 你最想從共學聚學到什麼？</div>
-                <textarea name="want_to_learn" rows="3" placeholder="例如：想知道怎麼用 AI 幫我做內容、想學 Agent 串接、想找到志同道合的夥伴..." class="w-full p-3.5 rounded-xl text-sm resize-none"></textarea>
+                <div class="section-heading">你最想從共學聚學到什麼？</div>
+                <textarea name="want_to_learn" rows="3" placeholder="例如：想知道怎麼用 AI 幫我做內容、想學 Agent 串接、想找到志同道合的夥伴..." class="w-full p-3.5 rounded-xl text-sm resize-none mt-2"></textarea>
             </div>
 
             <!-- 職業 / 行業 -->
             <div class="space-y-3">
-                <div class="section-title"><i class="fas fa-briefcase text-orange-400"></i> 你的職業 / 行業？</div>
-                <select name="job_type" class="w-full p-3.5 rounded-xl text-sm">
+                <div class="section-label">關於你</div>
+                <div class="section-heading">你的職業 / 行業？</div>
+                <select name="job_type" class="w-full p-3.5 rounded-xl text-sm mt-2">
                     <option value="">請選擇最接近的類別</option>
-                    <optgroup label="🚀 創業 & 自媒體">
+                    <optgroup label="創業 & 自媒體">
                         <option value="創業者/老闆">創業者 / 老闆</option>
                         <option value="自由工作者">自由工作者 / 接案</option>
                         <option value="自媒體/KOL">自媒體 / KOL / 部落客</option>
                     </optgroup>
-                    <optgroup label="💼 企業職場">
+                    <optgroup label="企業職場">
                         <option value="行銷/品牌">行銷 / 品牌 / 社群</option>
                         <option value="業務/銷售">業務 / 銷售</option>
                         <option value="產品/設計">產品 / 設計 / UX</option>
@@ -242,11 +384,11 @@
                         <option value="人資/行政">人資 / 行政 / 客服</option>
                         <option value="財務/會計">財務 / 會計</option>
                     </optgroup>
-                    <optgroup label="📚 教育 & 醫療">
+                    <optgroup label="教育 & 醫療">
                         <option value="教育/老師">教育 / 老師 / 講師</option>
                         <option value="醫療/健康">醫療 / 健康照護</option>
                     </optgroup>
-                    <optgroup label="🎓 學生 & 其他">
+                    <optgroup label="學生 & 其他">
                         <option value="學生">學生</option>
                         <option value="待業/轉職中">待業 / 轉職中</option>
                         <option value="其他">其他</option>
@@ -256,8 +398,8 @@
 
             <!-- 如何知道 -->
             <div class="space-y-2">
-                <div class="section-title"><i class="fas fa-share-alt text-pink-400"></i> 你是怎麼知道這個活動的？</div>
-                <select name="source" class="w-full p-3.5 rounded-xl text-sm">
+                <div class="section-heading">你是怎麼知道這個活動的？</div>
+                <select name="source" class="w-full p-3.5 rounded-xl text-sm mt-2">
                     <option value="">請選擇</option>
                     <option value="Facebook">Facebook 貼文</option>
                     <option value="Instagram">Instagram</option>
@@ -268,33 +410,28 @@
             </div>
 
             <!-- 加入官方 LINE@ -->
-            <div class="line-box space-y-4">
+            <div class="line-box space-y-3">
                 <div class="flex items-center gap-2 font-semibold text-green-300 text-sm">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="#00B900"><path d="M19.365 9.89c.50 0 .906.41.906.91s-.406.91-.906.91H17.87v1.04h1.495c.50 0 .906.41.906.91s-.406.91-.906.91H16.96a.91.91 0 0 1-.906-.91V9.89c0-.50.406-.91.906-.91h2.405zm-5.23 3.77c.30.42.19.99-.24 1.28a.91.91 0 0 1-1.27-.24l-1.96-2.77v2.1c0 .50-.41.91-.91.91s-.91-.41-.91-.91V9.89c0-.40.26-.76.64-.88.38-.12.80 0 1.03.31l1.96 2.77V9.89c0-.50.41-.91.91-.91s.91.41.91.91v3.77zm-6.14.91c0 .50-.41.91-.91.91s-.91-.41-.91-.91V9.89c0-.50.41-.91.91-.91s.91.41.91.91v3.77zM5.14 8.98H3.64c-.50 0-.906-.41-.906-.91s.406-.91.906-.91H5.14c.50 0 .906.41.906.91v3.77c0 .50-.406.91-.906.91s-.906-.41-.906-.91V8.98zM12 0C5.373 0 0 4.97 0 11.09c0 5.49 4.375 10.08 10.285 10.94.40.087.946.267 1.085.61.124.31.081.80.04 1.115l-.175 1.065c-.053.31-.245 1.215 1.065.663 1.31-.553 7.065-4.161 9.635-7.125C23.535 16.37 24 13.8 24 11.09 24 4.97 18.627 0 12 0z"/></svg>
                     加入官方 LINE@ — 掌握 AI 最新資訊
                 </div>
 
-                <!-- 加入 LINE@ 的好處 -->
-                <div class="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs text-center">
-                    <div class="bg-green-500/10 rounded-xl p-3 border border-green-500/15">
-                        <div class="text-lg mb-1">🔔</div>
-                        <div class="text-green-300 font-medium">活動提醒</div>
-                        <div class="text-slate-500 mt-0.5">每次活動前自動通知</div>
+                <div class="grid grid-cols-3 gap-2 text-xs text-center">
+                    <div class="bg-green-500/5 rounded-xl p-3 border border-green-500/10">
+                        <div class="text-green-300 font-medium mb-0.5">活動提醒</div>
+                        <div class="text-slate-500 text-[11px]">每場活動前自動通知</div>
                     </div>
-                    <div class="bg-green-500/10 rounded-xl p-3 border border-green-500/15">
-                        <div class="text-lg mb-1">🤖</div>
-                        <div class="text-green-300 font-medium">AI 工具情報</div>
-                        <div class="text-slate-500 mt-0.5">最新工具第一手分享</div>
+                    <div class="bg-green-500/5 rounded-xl p-3 border border-green-500/10">
+                        <div class="text-green-300 font-medium mb-0.5">AI 工具情報</div>
+                        <div class="text-slate-500 text-[11px]">最新工具第一手分享</div>
                     </div>
-                    <div class="bg-green-500/10 rounded-xl p-3 border border-green-500/15">
-                        <div class="text-lg mb-1">👥</div>
-                        <div class="text-green-300 font-medium">社群連結</div>
-                        <div class="text-slate-500 mt-0.5">認識其他 AI 共學夥伴</div>
+                    <div class="bg-green-500/5 rounded-xl p-3 border border-green-500/10">
+                        <div class="text-green-300 font-medium mb-0.5">社群連結</div>
+                        <div class="text-slate-500 text-[11px]">認識其他 AI 共學夥伴</div>
                     </div>
                 </div>
 
-                <!-- 勾選訂閱 -->
-                <label class="flex items-start gap-3 cursor-pointer group">
+                <label class="flex items-start gap-3 cursor-pointer group pt-1">
                     <input type="checkbox" name="subscribe_line" value="yes" class="mt-0.5 w-4 h-4 flex-shrink-0" style="accent-color:#00B900;">
                     <span class="text-sm text-slate-400 group-hover:text-slate-300 transition-colors">
                         我想接收 AI 共學聚的活動通知與 AI 資訊（報名後可一鍵綁定 LINE）
@@ -303,39 +440,41 @@
             </div>
 
             <!-- 送出 -->
-            <button type="submit" id="submitBtn" class="submit-btn w-full py-4 text-white font-bold rounded-xl shadow-lg text-base">
-                確認報名 🚀
-            </button>
-            <p class="text-center text-xs text-slate-600">報名後將收到 Email 確認信，若有任何問題歡迎私訊</p>
+            <div class="pt-2">
+                <button type="submit" id="submitBtn" class="submit-btn w-full py-4 text-white font-bold rounded-xl shadow-lg text-base display-font">
+                    確認報名
+                </button>
+                <p class="text-center text-xs text-slate-500 mt-3">報名後將收到 Email 確認信，若有任何問題歡迎私訊主辦人</p>
+            </div>
         </form>
     </div>
 
     <!-- Footer -->
-    <div class="mt-8 glass-card rounded-2xl p-6">
-        <p class="text-center text-slate-500 text-xs mb-4 uppercase tracking-widest">主辦人</p>
+    <div class="footer-card rounded-2xl p-6">
+        <p class="text-center text-slate-400 text-xs mb-4 uppercase tracking-widest font-medium">主辦人</p>
         <div class="grid grid-cols-2 gap-4">
-            <a href="https://www.facebook.com/dindin0702?locale=zh_TW" target="_blank" rel="noopener" class="flex items-center gap-3 p-3 rounded-xl bg-blue-600/10 border border-blue-600/20 hover:bg-blue-600/20 transition-all group">
-                <div class="w-10 h-10 rounded-full bg-blue-600/30 flex items-center justify-center flex-shrink-0">
-                    <i class="fab fa-facebook-f text-blue-400 text-sm"></i>
+            <a href="https://www.facebook.com/dindin0702?locale=zh_TW" target="_blank" rel="noopener" class="flex items-center gap-3 p-3 rounded-xl bg-slate-50 border border-slate-200 hover:bg-blue-50 hover:border-blue-200 transition-all group">
+                <div class="w-10 h-10 rounded-full bg-blue-600/10 flex items-center justify-center flex-shrink-0">
+                    <i class="fab fa-facebook-f text-blue-600 text-sm"></i>
                 </div>
                 <div>
-                    <div class="text-sm font-semibold text-white group-hover:text-blue-300 transition-colors">Din Din Wang</div>
-                    <div class="text-xs text-slate-500">Facebook →</div>
+                    <div class="text-sm font-semibold text-slate-900 group-hover:text-blue-700 transition-colors">Din Din Wang</div>
+                    <div class="text-xs text-slate-500">Facebook</div>
                 </div>
             </a>
-            <a href="https://www.facebook.com/profile.php?id=61575277011688&locale=zh_TW" target="_blank" rel="noopener" class="flex items-center gap-3 p-3 rounded-xl bg-blue-600/10 border border-blue-600/20 hover:bg-blue-600/20 transition-all group">
-                <div class="w-10 h-10 rounded-full bg-blue-600/30 flex items-center justify-center flex-shrink-0">
-                    <i class="fab fa-facebook-f text-blue-400 text-sm"></i>
+            <a href="https://www.facebook.com/profile.php?id=61575277011688&locale=zh_TW" target="_blank" rel="noopener" class="flex items-center gap-3 p-3 rounded-xl bg-slate-50 border border-slate-200 hover:bg-blue-50 hover:border-blue-200 transition-all group">
+                <div class="w-10 h-10 rounded-full bg-blue-600/10 flex items-center justify-center flex-shrink-0">
+                    <i class="fab fa-facebook-f text-blue-600 text-sm"></i>
                 </div>
                 <div>
-                    <div class="text-sm font-semibold text-white group-hover:text-blue-300 transition-colors">阿邦老師</div>
-                    <div class="text-xs text-slate-500">Facebook →</div>
+                    <div class="text-sm font-semibold text-slate-900 group-hover:text-blue-700 transition-colors">阿邦老師</div>
+                    <div class="text-xs text-slate-500">Facebook</div>
                 </div>
             </a>
         </div>
     </div>
 
-    <p class="text-center text-slate-700 text-xs mt-6">AI 共學聚 · 每月第一個週一 · 共學共進化 🧬</p>
+    <p class="text-center text-slate-400 text-xs pb-4">AI 共學聚 · 每月第一個週一 · 共學共進化</p>
 </div>
 
 <script>
@@ -347,7 +486,6 @@ document.getElementById('registerForm').addEventListener('submit', async functio
     btn.textContent = '送出中...';
     btn.disabled = true;
 
-    // 若超過 6 秒還沒回應，顯示等待提示
     const slowTimer = setTimeout(() => {
         btn.textContent = '連線中，請稍候...';
     }, 6000);
@@ -394,13 +532,11 @@ document.getElementById('registerForm').addEventListener('submit', async functio
         }
     } finally {
         clearTimeout(slowTimer);
-        btn.textContent = '確認報名 🚀';
+        btn.textContent = '確認報名';
         btn.disabled = false;
     }
 });
 
-// Email 即時檢查
-let checkTimer;
 document.getElementById('emailInput').addEventListener('blur', async function() {
     const email = this.value.trim();
     if (!email || !email.includes('@')) return;
@@ -414,30 +550,27 @@ document.getElementById('emailInput').addEventListener('blur', async function() 
 
 function showEmailAlert(name, attendance) {
     const box = document.getElementById('emailAlert');
-    const attendText = attendance === 'Yes' ? '已確認參加 ✅' : attendance === 'Maybe' ? '已填「不確定」🤔' : '已填「無法參加」❌';
-    box.className = 'rounded-xl p-4 border text-sm bg-yellow-500/10 border-yellow-500/30 text-yellow-300';
+    const attendText = attendance === 'Yes' ? '已確認參加' : attendance === 'Maybe' ? '已填「不確定」' : '已填「無法參加」';
+    box.className = 'rounded-xl p-4 border text-sm bg-amber-500/10 border-amber-500/30 text-amber-300';
     box.innerHTML = `
-        <div class="font-semibold mb-1">👋 ${name}，你已經報名過了！</div>
-        <div class="text-xs text-yellow-400/80">出席狀態：${attendText}</div>
+        <div class="font-semibold mb-1">${name}，你已經報名過了</div>
+        <div class="text-xs text-amber-400/80">出席狀態：${attendText}</div>
         <div class="text-xs text-slate-500 mt-1">如需修改資訊，請私訊主辦人</div>
     `;
     box.classList.remove('hidden');
     document.getElementById('submitBtn').disabled = true;
-    document.getElementById('submitBtn').classList.add('opacity-50');
 }
 
 document.getElementById('emailInput').addEventListener('input', function() {
     document.getElementById('emailAlert').classList.add('hidden');
     document.getElementById('submitBtn').disabled = false;
-    document.getElementById('submitBtn').classList.remove('opacity-50');
 });
 
-// 偵測 LINE 綁定結果
 const urlParams = new URLSearchParams(window.location.search);
 const bound = urlParams.get('bound');
 const name = urlParams.get('name');
 if (bound === 'success') {
-    document.getElementById('boundMsg').textContent = `${name ? name + '，' : ''}LINE 綁定完成！活動前會透過 LINE 通知你，5/4 見！🧬`;
+    document.getElementById('boundMsg').textContent = `${name ? name + '，' : ''}LINE 綁定完成！活動前會透過 LINE 通知你，5/4 見`;
     document.getElementById('boundOverlay').classList.add('show');
     history.replaceState({}, '', '/');
 } else if (bound === 'noReg') {
