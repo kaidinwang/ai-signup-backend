@@ -6,6 +6,40 @@ const nodemailer = require('nodemailer');
 const line = require('@line/bot-sdk');
 const cron = require('node-cron');
 const path = require('path');
+const https = require('https');
+
+// Node 18 以下沒有 global fetch，用 https 模組替代
+function httpsPost(url, params) {
+  return new Promise((resolve, reject) => {
+    const body = new URLSearchParams(params).toString();
+    const u = new URL(url);
+    const req = https.request({ hostname: u.hostname, path: u.pathname, method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'Content-Length': Buffer.byteLength(body) }
+    }, res => {
+      let data = '';
+      res.on('data', c => data += c);
+      res.on('end', () => resolve(JSON.parse(data)));
+    });
+    req.on('error', reject);
+    req.write(body);
+    req.end();
+  });
+}
+
+function httpsGet(url, token) {
+  return new Promise((resolve, reject) => {
+    const u = new URL(url);
+    const req = https.request({ hostname: u.hostname, path: u.pathname,
+      headers: { Authorization: `Bearer ${token}` }
+    }, res => {
+      let data = '';
+      res.on('data', c => data += c);
+      res.on('end', () => resolve(JSON.parse(data)));
+    });
+    req.on('error', reject);
+    req.end();
+  });
+}
 
 const app = express();
 app.use(cors());
@@ -212,26 +246,18 @@ app.get('/line-callback', async (req, res) => {
 
   try {
     // 用 code 換 access token
-    const tokenRes = await fetch('https://api.line.me/oauth2/v2.1/token', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: new URLSearchParams({
-        grant_type: 'authorization_code',
-        code,
-        redirect_uri: callbackUrl,
-        client_id: process.env.LINE_LOGIN_CHANNEL_ID,
-        client_secret: process.env.LINE_LOGIN_CHANNEL_SECRET,
-      }),
+    const token = await httpsPost('https://api.line.me/oauth2/v2.1/token', {
+      grant_type: 'authorization_code',
+      code,
+      redirect_uri: callbackUrl,
+      client_id: process.env.LINE_LOGIN_CHANNEL_ID,
+      client_secret: process.env.LINE_LOGIN_CHANNEL_SECRET,
     });
-    const token = await tokenRes.json();
     console.log('[LINE Login] token response:', JSON.stringify(token));
     if (!token.access_token) return res.redirect('/?bound=fail');
 
     // 取得 LINE 使用者資料
-    const profileRes = await fetch('https://api.line.me/v2/profile', {
-      headers: { Authorization: `Bearer ${token.access_token}` },
-    });
-    const profile = await profileRes.json();
+    const profile = await httpsGet('https://api.line.me/v2/profile', token.access_token);
     const userId = profile.userId;
     const displayName = profile.displayName;
 
