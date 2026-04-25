@@ -320,10 +320,15 @@ app.post('/webhook', express.raw({ type: '*/*' }), lineMiddleware, async (req, r
       const text = event.message.text.trim();
       const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-      // 檢查使用者是否已綁定報名
-      const alreadyBound = await pool.query('SELECT name FROM registrations WHERE line_user_id=$1 LIMIT 1', [userId]);
+      // 檢查使用者是否已綁定（line_bindings 或 registrations 任一有記錄）
+      const alreadyBound = await pool.query(`
+        SELECT 1 FROM line_bindings WHERE line_user_id=$1
+        UNION ALL
+        SELECT 1 FROM registrations WHERE line_user_id=$1
+        LIMIT 1
+      `, [userId]);
       if (alreadyBound.rows[0]) {
-        // 已綁定者傳訊息：不主動回應，避免騷擾
+        console.log('[LINE] Skip auto-reply for already-bound user:', userId);
         continue;
       }
 
