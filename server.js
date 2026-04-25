@@ -330,7 +330,7 @@ app.post('/webhook', express.raw({ type: '*/*' }), lineMiddleware, async (req, r
       } else {
         await lineClient.replyMessage(event.replyToken, {
           type: 'text',
-          text: `歡迎加入 AI 共學聚 🧬\n\n請傳送你填寫報名表單時使用的 Email\n我們就能在活動前自動通知你！\n\n例如：yourname@gmail.com`,
+          text: `歡迎加入 宇宙種子 CosmoSeed AI🧬\n\n這裡會分享：\n・每月共學聚活動通知（下一場 5/4 線上）\n・AI 工具情報與社群動態\n・品牌行銷策略與實戰拆解\n\n▸ 想參加 5/4 共學聚？\n報名連結：https://ai-signup-backend.onrender.com\n\n▸ 已經報名過了？\n請傳送你報名時使用的 Email 完成綁定\n（例：yourname@gmail.com）`,
         });
       }
     }
