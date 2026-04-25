@@ -58,7 +58,7 @@
 
     <!-- Filters -->
     <div class="glass rounded-2xl p-4 flex items-center gap-4 flex-wrap">
-        <input id="searchInput" type="text" placeholder="🔍 搜尋姓名 / Email..." oninput="filterTable()" autocomplete="off" class="px-4 py-2 rounded-xl bg-slate-800 border border-white/10 text-white text-sm w-60">
+        <input id="searchInput" type="search" placeholder="🔍 搜尋姓名 / Email..." oninput="filterTable()" autocomplete="off" autocorrect="off" spellcheck="false" name="adm_search_no_fill" class="px-4 py-2 rounded-xl bg-slate-800 border border-white/10 text-white text-sm w-60">
         <select id="attendFilter" onchange="filterTable()" class="px-3 py-2 rounded-xl bg-slate-800 border border-white/10 text-white text-sm">
             <option value="">所有出席狀態</option>
             <option value="Yes">✅ 確認參加</option>
@@ -132,6 +132,7 @@ async function loadData() {
         document.getElementById('loginScreen').classList.add('hidden');
         document.getElementById('mainContent').classList.remove('hidden');
         document.getElementById('loginError').classList.add('hidden');
+        document.getElementById('searchInput').value = '';
         allData = json.registrations;
         renderStats(json.stats);
         filteredData = [...allData];
