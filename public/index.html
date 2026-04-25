@@ -192,29 +192,30 @@
 
     <!-- Header (light) -->
     <header class="text-center pt-4 pb-2">
-        <div class="inline-block px-4 py-1 rounded-full bg-white/60 border border-slate-200/80 text-xs font-medium text-slate-600 mb-5 backdrop-blur">
+        <div class="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-gradient-to-r from-blue-600 to-purple-600 text-white text-xs font-semibold mb-5 shadow-sm shadow-blue-600/20">
+            <span class="w-1.5 h-1.5 rounded-full bg-white animate-pulse"></span>
             AI 共學聚 · 月度線上聚會
         </div>
-        <h1 class="display-font text-5xl md:text-6xl font-extrabold text-slate-900 leading-tight mb-5">
+        <h1 class="display-font text-5xl md:text-6xl font-extrabold text-slate-900 leading-tight mb-5" style="text-wrap: balance;">
             一起共學，<br class="md:hidden">與 AI 同進化
         </h1>
-        <div class="text-slate-600 text-[15px] md:text-base leading-[1.85] max-w-xl mx-auto mb-7 space-y-3 text-left md:text-center">
-            <p>
-                這是 <span class="font-semibold text-slate-800">阿邦老師</span> 和我（<span class="font-semibold text-slate-800">Din Din</span>）共同發起的線上共學聚。每月一次，我們分享自己最近怎麼用 AI、踩過哪些坑、又有哪些好用的新工具，純粹想和大家一起把 AI 學好、用好。
+        <div class="text-slate-600 text-[15px] md:text-base leading-[1.85] max-w-xl mx-auto mb-7 space-y-3 text-left md:text-center" style="text-wrap: pretty;">
+            <p style="text-wrap: pretty;">
+                這是 <span class="font-semibold text-slate-800">阿邦老師</span> 和我（<span class="font-semibold text-slate-800">Din Din</span>）共同發起的線上共學聚。每月一次，分享我們最近怎麼用 AI、踩過哪些坑、又有哪些新工具，想和大家一起把 AI 學好、用好。
             </p>
-            <p>
-                沒有壓力，也沒有門檻——願意分享就報名當主講人，想安靜聽就當來賓，輕鬆來就好，也歡迎你帶線上好友一起加入。
+            <p style="text-wrap: pretty;">
+                沒有壓力，也沒有門檻——願意分享就報名當主講人，想安靜聽就當來賓，輕鬆來就好。也歡迎帶線上好友一起加入。
             </p>
         </div>
         <div class="inline-flex items-center gap-6 px-6 py-4 rounded-2xl bg-white/70 border border-slate-200/80 backdrop-blur">
             <div>
                 <div class="text-xs text-slate-500 mb-1">日期</div>
-                <div class="display-font text-2xl font-bold text-slate-900">5/4 <span class="text-base font-medium text-slate-500">(週一)</span></div>
+                <div class="display-font text-2xl font-bold text-slate-900 whitespace-nowrap">5/4 <span class="text-base font-medium text-slate-500">(週一)</span></div>
             </div>
             <div class="w-px h-10 bg-slate-200"></div>
             <div>
                 <div class="text-xs text-slate-500 mb-1">時間</div>
-                <div class="display-font text-2xl font-bold text-slate-900">20:00 – 21:00</div>
+                <div class="display-font text-2xl font-bold text-slate-900 whitespace-nowrap">20:00 – 21:00</div>
             </div>
             <div class="w-px h-10 bg-slate-200 hidden sm:block"></div>
             <div class="hidden sm:block">
@@ -239,7 +240,7 @@
         </div>
 
         <div class="mt-7 pt-6 border-t border-slate-100">
-            <div class="text-xs font-semibold text-slate-500 uppercase tracking-[0.15em] mb-4 text-center">本次課綱</div>
+            <div class="display-font text-lg font-bold text-slate-900 mb-5 text-center">本次課綱</div>
             <ol class="space-y-3 max-w-lg mx-auto">
                 <li class="flex items-start gap-4">
                     <span class="flex-shrink-0 w-7 h-7 rounded-full bg-slate-900 text-white text-xs font-bold flex items-center justify-center mt-0.5">1</span>
@@ -266,7 +267,7 @@
                     <span class="flex-shrink-0 w-7 h-7 rounded-full bg-slate-900 text-white text-xs font-bold flex items-center justify-center mt-0.5">4</span>
                     <div>
                         <div class="font-semibold text-slate-900 text-[15px]">Q & A 自由交流</div>
-                        <div class="text-sm text-slate-500 mt-0.5">提問、討論、認識新朋友</div>
+                        <div class="text-sm text-slate-500 mt-0.5">提問、討論</div>
                     </div>
                 </li>
             </ol>
@@ -505,9 +506,9 @@
         </form>
     </div>
 
-    <!-- Speakers -->
+    <!-- Organizers -->
     <div class="footer-card rounded-3xl p-7 md:p-8">
-        <p class="text-center text-slate-400 text-xs mb-6 uppercase tracking-[0.18em] font-semibold">主講人</p>
+        <p class="text-center text-slate-900 text-lg mb-6 font-bold display-font">主辦人介紹</p>
         <div class="grid md:grid-cols-2 gap-5">
 
             <!-- Din Din -->
@@ -524,8 +525,8 @@
                         AI 應用實戰派，每天都在玩各種工具。喜歡把複雜的東西拆解、轉譯成大家用得上的方法。
                     </p>
                     <a href="https://www.facebook.com/dindin0702?locale=zh_TW" target="_blank" rel="noopener"
-                       class="inline-flex items-center gap-1.5 text-xs text-blue-600 hover:text-blue-700 font-medium mt-2.5 transition-colors">
-                        <i class="fab fa-facebook-f"></i> Facebook
+                       class="inline-flex items-center gap-2 mt-3 px-3.5 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold transition-all shadow-sm hover:shadow-md hover:-translate-y-0.5">
+                        <i class="fab fa-facebook-f"></i> 追蹤 Facebook
                     </a>
                 </div>
             </div>
@@ -544,8 +545,8 @@
                         資深 AI 講師，擅長把硬核技術翻譯成人話，讓沒寫過程式的人也能用 AI 把事情做出來。
                     </p>
                     <a href="https://www.facebook.com/profile.php?id=61575277011688&locale=zh_TW" target="_blank" rel="noopener"
-                       class="inline-flex items-center gap-1.5 text-xs text-blue-600 hover:text-blue-700 font-medium mt-2.5 transition-colors">
-                        <i class="fab fa-facebook-f"></i> Facebook
+                       class="inline-flex items-center gap-2 mt-3 px-3.5 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold transition-all shadow-sm hover:shadow-md hover:-translate-y-0.5">
+                        <i class="fab fa-facebook-f"></i> 追蹤 Facebook
                     </a>
                 </div>
             </div>
