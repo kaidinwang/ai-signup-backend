@@ -364,7 +364,8 @@ app.post('/webhook', express.raw({ type: '*/*' }), lineMiddleware, async (req, r
           await pool.query('UPDATE registrations SET line_user_id=$1 WHERE email=$2', [userId, email]);
           await lineClient.replyMessage(event.replyToken, { type: 'text', text: `AI 共學聚 綁定成功 🎉\n\n${reg.rows[0].name} 你好！\n活動前我們會透過 LINE 提醒你，5/4 見！🧬` });
         } else {
-          await lineClient.replyMessage(event.replyToken, { type: 'text', text: `AI 共學聚 📋\n\nEmail 已記錄！\n請先完成報名表單，填寫相同的 Email，我們就能在活動前通知你 🔔\n\n報名連結：https://ai-signup-backend.onrender.com` });
+          // 外部報名者（如活動通）：line_bindings 已寫入，直接通知綁定成功，不要求重填站內表單
+          await lineClient.replyMessage(event.replyToken, { type: 'text', text: `AI 共學聚 綁定成功 🎉\n\n活動前我們會透過 LINE 提醒你，5/4 見！🧬` });
         }
       } else {
         await lineClient.replyMessage(event.replyToken, { type: 'text', text: `嗨！請傳送你報名時使用的 Email 給我\n\n例如：yourname@gmail.com` });
