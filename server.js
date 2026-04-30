@@ -282,13 +282,16 @@ app.get('/line-callback', async (req, res) => {
     const reg = await pool.query('SELECT * FROM registrations WHERE email=$1', [email.toLowerCase()]);
     if (reg.rows[0]) {
       await pool.query('UPDATE registrations SET line_user_id=$1 WHERE email=$2', [userId, email.toLowerCase()]);
-      // 發送歡迎 LINE 訊息
       await sendLine(userId,
         `AI 共學聚 綁定成功 🎉\n\n${reg.rows[0].name} 你好！\n活動前我們會透過 LINE 提醒你，5/4 見！🧬`
       );
       res.redirect('/?bound=success&name=' + encodeURIComponent(reg.rows[0].name));
     } else {
-      res.redirect('/?bound=noReg');
+      // 外部報名者（如活動通）：line_bindings 已寫入，回成功頁不要求重填站內表單
+      await sendLine(userId,
+        `AI 共學聚 綁定成功 🎉\n\n活動前我們會透過 LINE 提醒你，5/4 見！🧬`
+      );
+      res.redirect('/?bound=success');
     }
   } catch (err) {
     console.error('[LINE Login Error]', err.message);
