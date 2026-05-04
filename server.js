@@ -72,6 +72,7 @@ async function initDB() {
       want_to_learn TEXT,
       subscribe_line TEXT,
       line_user_id  TEXT,
+      next_event_interested BOOLEAN DEFAULT FALSE,
       created_at    TIMESTAMPTZ DEFAULT NOW()
     );
     CREATE TABLE IF NOT EXISTS line_bindings (
@@ -81,6 +82,8 @@ async function initDB() {
       created_at    TIMESTAMPTZ DEFAULT NOW()
     );
   `);
+  // Migration: 為既有表補上後台新增欄位
+  await pool.query(`ALTER TABLE registrations ADD COLUMN IF NOT EXISTS next_event_interested BOOLEAN DEFAULT FALSE`);
   // 一次性修復：把所有 email 統一轉小寫，避免 LINE 綁定對不上
   const fixed = await pool.query(`
     UPDATE registrations SET email = LOWER(TRIM(email))
@@ -409,6 +412,11 @@ function adminAuth(req, res, next) {
 app.get('/admin/api/registrations', adminAuth, async (req, res) => {
   const result = await pool.query('SELECT * FROM registrations ORDER BY created_at DESC');
   const rows = result.rows;
+  const bySource = {};
+  for (const r of rows) {
+    const ch = r.source || '(未標記)';
+    bySource[ch] = (bySource[ch] || 0) + 1;
+  }
   res.json({
     stats: {
       total:        rows.length,
@@ -416,9 +424,29 @@ app.get('/admin/api/registrations', adminAuth, async (req, res) => {
       maybe:        rows.filter(r => r.attendance === 'Maybe').length,
       notAttending: rows.filter(r => r.attendance === 'No').length,
       lineLinked:   rows.filter(r => r.line_user_id).length,
+      nextEvent:    rows.filter(r => r.next_event_interested).length,
+      bySource,
     },
     registrations: rows,
   });
+});
+
+app.patch('/admin/api/registrations/:id', adminAuth, async (req, res) => {
+  const fields = [];
+  const values = [];
+  let idx = 1;
+  if (req.body.source !== undefined) {
+    fields.push(`source=$${idx++}`);
+    values.push(req.body.source || null);
+  }
+  if (req.body.next_event_interested !== undefined) {
+    fields.push(`next_event_interested=$${idx++}`);
+    values.push(!!req.body.next_event_interested);
+  }
+  if (fields.length === 0) return res.status(400).json({ error: 'No fields to update' });
+  values.push(req.params.id);
+  await pool.query(`UPDATE registrations SET ${fields.join(', ')} WHERE id=$${idx}`, values);
+  res.json({ success: true });
 });
 
 app.delete('/admin/api/registrations/:id', adminAuth, async (req, res) => {

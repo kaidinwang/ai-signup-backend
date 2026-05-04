@@ -58,8 +58,11 @@
     <!-- Stats -->
     <div id="statsGrid" class="grid grid-cols-2 md:grid-cols-5 gap-4"></div>
 
+    <!-- Source breakdown -->
+    <div id="sourceBreakdown"></div>
+
     <!-- Filters -->
-    <div class="glass rounded-2xl p-4 flex items-center gap-4 flex-wrap">
+    <div class="glass rounded-2xl p-4 flex items-center gap-3 flex-wrap">
         <input id="searchInput" type="search" placeholder="🔍 搜尋姓名 / Email..." oninput="filterTable()" autocomplete="off" autocorrect="off" spellcheck="false" name="adm_search_no_fill" class="px-4 py-2 rounded-xl bg-slate-800 border border-white/10 text-white text-sm w-60">
         <select id="attendFilter" onchange="filterTable()" class="px-3 py-2 rounded-xl bg-slate-800 border border-white/10 text-white text-sm">
             <option value="">所有出席狀態</option>
@@ -72,8 +75,24 @@
             <option value="linked">✅ 已綁定</option>
             <option value="unlinked">❌ 未綁定</option>
         </select>
+        <select id="sourceFilter" onchange="filterTable()" class="px-3 py-2 rounded-xl bg-slate-800 border border-white/10 text-white text-sm">
+            <option value="">所有報名來源</option>
+        </select>
+        <select id="nextEventFilter" onchange="filterTable()" class="px-3 py-2 rounded-xl bg-slate-800 border border-white/10 text-white text-sm">
+            <option value="">下一場意願</option>
+            <option value="yes">⭐ 想參加</option>
+            <option value="no">未標記</option>
+        </select>
         <span id="countLabel" class="text-slate-500 text-sm ml-auto"></span>
     </div>
+
+    <datalist id="sourceSuggestions">
+        <option value="活動通"></option>
+        <option value="Din 老師"></option>
+        <option value="阿邦老師"></option>
+        <option value="朋友介紹"></option>
+        <option value="其他"></option>
+    </datalist>
 
     <!-- Table -->
     <div class="glass rounded-2xl overflow-hidden">
@@ -90,7 +109,8 @@
                         <th>職業</th>
                         <th>使用工具</th>
                         <th>興趣領域</th>
-                        <th>來源</th>
+                        <th>報名來源</th>
+                        <th>下一場</th>
                         <th>報名時間</th>
                         <th></th>
                     </tr>
@@ -150,8 +170,8 @@ function renderStats(stats) {
         { label: '總報名', value: stats.total,        color: 'text-blue-400',   icon: '👥' },
         { label: '確認參加', value: stats.attending,  color: 'text-emerald-400', icon: '✅' },
         { label: '不確定', value: stats.maybe,         color: 'text-yellow-400', icon: '🤔' },
-        { label: '無法參加', value: stats.notAttending,color: 'text-slate-400',  icon: '❌' },
         { label: 'LINE 已綁定', value: stats.lineLinked, color: 'text-green-400', icon: '💬' },
+        { label: '下一場意願', value: stats.nextEvent || 0, color: 'text-amber-400', icon: '⭐' },
     ];
     document.getElementById('statsGrid').innerHTML = cards.map(c => `
         <div class="stat-card">
@@ -160,6 +180,29 @@ function renderStats(stats) {
             <div class="text-xs text-slate-500 mt-1">${c.label}</div>
         </div>
     `).join('');
+
+    // 報名來源 breakdown
+    const bySource = stats.bySource || {};
+    const sourceEntries = Object.entries(bySource).sort((a, b) => b[1] - a[1]);
+    const breakdownHTML = sourceEntries.length === 0 ? '' : `
+        <div class="glass rounded-2xl p-4">
+            <div class="text-xs text-slate-500 uppercase tracking-wider mb-3">📊 報名來源分布</div>
+            <div class="flex flex-wrap gap-2">
+                ${sourceEntries.map(([k, v]) => `
+                    <div class="bg-slate-800 border border-white/5 rounded-lg px-3 py-2 text-sm">
+                        <span class="text-slate-300">${esc(k)}</span>
+                        <span class="text-blue-400 font-bold ml-2">${v}</span>
+                    </div>
+                `).join('')}
+            </div>
+        </div>`;
+    document.getElementById('sourceBreakdown').innerHTML = breakdownHTML;
+
+    // Populate source filter dropdown
+    const sourceFilter = document.getElementById('sourceFilter');
+    const currentValue = sourceFilter.value;
+    sourceFilter.innerHTML = '<option value="">所有報名來源</option>' +
+        sourceEntries.map(([k]) => `<option value="${esc(k)}"${k === currentValue ? ' selected' : ''}>${esc(k)}</option>`).join('');
 }
 
 const attendBadge = {
@@ -172,12 +215,16 @@ function renderTable() {
     const q = (document.getElementById('searchInput')?.value || '').toLowerCase();
     const af = document.getElementById('attendFilter')?.value || '';
     const lf = document.getElementById('lineFilter')?.value || '';
+    const sf = document.getElementById('sourceFilter')?.value || '';
+    const nf = document.getElementById('nextEventFilter')?.value || '';
 
     filteredData = allData.filter(r => {
         const matchSearch = !q || r.name.toLowerCase().includes(q) || r.email.toLowerCase().includes(q);
         const matchAttend = !af || r.attendance === af;
         const matchLine   = !lf || (lf === 'linked' ? !!r.line_user_id : !r.line_user_id);
-        return matchSearch && matchAttend && matchLine;
+        const matchSource = !sf || (r.source || '(未標記)') === sf;
+        const matchNext   = !nf || (nf === 'yes' ? !!r.next_event_interested : !r.next_event_interested);
+        return matchSearch && matchAttend && matchLine && matchSource && matchNext;
     });
 
     document.getElementById('countLabel').textContent = `顯示 ${filteredData.length} / ${allData.length} 筆`;
@@ -196,11 +243,12 @@ function renderTable() {
             <td class="text-xs text-slate-400 whitespace-nowrap">${esc(r.job_type || '—')}</td>
             <td class="text-xs text-slate-400 max-w-[160px]">${formatTags(r.tools, 'blue')}</td>
             <td class="text-xs text-slate-400 max-w-[160px]">${formatTags(r.interests, 'purple')}</td>
-            <td class="text-xs text-slate-500">${esc(r.source || '—')}</td>
+            <td><input type="text" list="sourceSuggestions" value="${esc(r.source || '')}" onchange="updateSource(${r.id}, this.value)" placeholder="選擇或輸入" class="bg-slate-800 border border-white/10 rounded px-2 py-1 text-xs text-slate-300 w-28"></td>
+            <td class="text-center"><input type="checkbox" ${r.next_event_interested ? 'checked' : ''} onchange="updateNextEvent(${r.id}, this.checked)" class="w-4 h-4 cursor-pointer" style="accent-color:#f59e0b;"></td>
             <td class="text-xs text-slate-500 whitespace-nowrap">${formatDate(r.created_at)}</td>
             <td><button onclick="deleteReg(${r.id}, '${esc(r.name)}')" class="text-red-500 hover:text-red-400 text-xs px-2 py-1 rounded hover:bg-red-500/10 transition-all">刪除</button></td>
         </tr>
-    `).join('') || '<tr><td colspan="11" class="text-center text-slate-600 py-10">沒有符合的報名者</td></tr>';
+    `).join('') || '<tr><td colspan="12" class="text-center text-slate-600 py-10">沒有符合的報名者</td></tr>';
 }
 
 function filterTable() { renderTable(); }
@@ -247,9 +295,10 @@ async function sendReminder(type) {
 }
 
 function exportCSV() {
-    const headers = ['姓名','Email','出席','程度','職業','工具','興趣領域','來源','LINE綁定','已訂閱LINE@','報名時間'];
+    const headers = ['姓名','Email','出席','程度','職業','工具','興趣領域','報名來源','下一場意願','LINE綁定','已訂閱LINE@','報名時間'];
     const rows = filteredData.map(r => [
         r.name, r.email, r.attendance, r.level, r.job_type, r.tools, r.interests, r.source,
+        r.next_event_interested ? '是' : '否',
         r.line_user_id ? '是' : '否', r.subscribe_line === 'yes' ? '是' : '否', r.created_at,
     ].map(v => `"${String(v || '').replace(/"/g, '""')}"`).join(','));
     const csv = '﻿' + [headers.join(','), ...rows].join('\n');
@@ -274,6 +323,50 @@ async function deleteReg(id, name) {
     if (!confirm(`確定要刪除「${name}」的報名資料？`)) return;
     await fetch(`/admin/api/registrations/${id}?pw=${encodeURIComponent(adminPw)}`, { method: 'DELETE' });
     loadData();
+}
+
+async function patchReg(id, body) {
+    const res = await fetch(`/admin/api/registrations/${id}?pw=${encodeURIComponent(adminPw)}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+    });
+    return res.ok;
+}
+
+async function updateSource(id, value) {
+    const ok = await patchReg(id, { source: value.trim() || null });
+    if (ok) {
+        const target = allData.find(r => r.id === id);
+        if (target) target.source = value.trim() || null;
+        renderStats(computeStats(allData));
+    }
+}
+
+async function updateNextEvent(id, checked) {
+    const ok = await patchReg(id, { next_event_interested: checked });
+    if (ok) {
+        const target = allData.find(r => r.id === id);
+        if (target) target.next_event_interested = checked;
+        renderStats(computeStats(allData));
+    }
+}
+
+function computeStats(rows) {
+    const bySource = {};
+    for (const r of rows) {
+        const ch = r.source || '(未標記)';
+        bySource[ch] = (bySource[ch] || 0) + 1;
+    }
+    return {
+        total:        rows.length,
+        attending:    rows.filter(r => r.attendance === 'Yes').length,
+        maybe:        rows.filter(r => r.attendance === 'Maybe').length,
+        notAttending: rows.filter(r => r.attendance === 'No').length,
+        lineLinked:   rows.filter(r => r.line_user_id).length,
+        nextEvent:    rows.filter(r => r.next_event_interested).length,
+        bySource,
+    };
 }
 
 document.getElementById('pwInput')?.addEventListener('keydown', e => e.key === 'Enter' && login());
