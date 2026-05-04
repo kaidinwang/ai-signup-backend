@@ -73,6 +73,7 @@ async function initDB() {
       subscribe_line TEXT,
       line_user_id  TEXT,
       next_event_interested BOOLEAN DEFAULT FALSE,
+      attended      BOOLEAN DEFAULT FALSE,
       created_at    TIMESTAMPTZ DEFAULT NOW()
     );
     CREATE TABLE IF NOT EXISTS line_bindings (
@@ -84,6 +85,7 @@ async function initDB() {
   `);
   // Migration: 為既有表補上後台新增欄位
   await pool.query(`ALTER TABLE registrations ADD COLUMN IF NOT EXISTS next_event_interested BOOLEAN DEFAULT FALSE`);
+  await pool.query(`ALTER TABLE registrations ADD COLUMN IF NOT EXISTS attended BOOLEAN DEFAULT FALSE`);
   // 一次性修復：把所有 email 統一轉小寫，避免 LINE 綁定對不上
   const fixed = await pool.query(`
     UPDATE registrations SET email = LOWER(TRIM(email))
@@ -425,6 +427,7 @@ app.get('/admin/api/registrations', adminAuth, async (req, res) => {
       notAttending: rows.filter(r => r.attendance === 'No').length,
       lineLinked:   rows.filter(r => r.line_user_id).length,
       nextEvent:    rows.filter(r => r.next_event_interested).length,
+      attended:     rows.filter(r => r.attended).length,
       bySource,
     },
     registrations: rows,
@@ -442,6 +445,10 @@ app.patch('/admin/api/registrations/:id', adminAuth, async (req, res) => {
   if (req.body.next_event_interested !== undefined) {
     fields.push(`next_event_interested=$${idx++}`);
     values.push(!!req.body.next_event_interested);
+  }
+  if (req.body.attended !== undefined) {
+    fields.push(`attended=$${idx++}`);
+    values.push(!!req.body.attended);
   }
   if (fields.length === 0) return res.status(400).json({ error: 'No fields to update' });
   values.push(req.params.id);

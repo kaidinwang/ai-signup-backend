@@ -56,7 +56,7 @@
     </div>
 
     <!-- Stats -->
-    <div id="statsGrid" class="grid grid-cols-2 md:grid-cols-5 gap-4"></div>
+    <div id="statsGrid" class="grid grid-cols-2 md:grid-cols-6 gap-4"></div>
 
     <!-- Source breakdown -->
     <div id="sourceBreakdown"></div>
@@ -82,6 +82,11 @@
             <option value="">下一場意願</option>
             <option value="yes">⭐ 想參加</option>
             <option value="no">未標記</option>
+        </select>
+        <select id="attendedFilter" onchange="filterTable()" class="px-3 py-2 rounded-xl bg-slate-800 border border-white/10 text-white text-sm">
+            <option value="">出席狀況</option>
+            <option value="yes">🟢 已到</option>
+            <option value="no">🔴 沒到</option>
         </select>
         <span id="countLabel" class="text-slate-500 text-sm ml-auto"></span>
     </div>
@@ -111,6 +116,7 @@
                         <th>興趣領域</th>
                         <th>報名來源</th>
                         <th>下一場</th>
+                        <th>出席</th>
                         <th>報名時間</th>
                         <th></th>
                     </tr>
@@ -171,6 +177,7 @@ function renderStats(stats) {
         { label: '確認參加', value: stats.attending,  color: 'text-emerald-400', icon: '✅' },
         { label: '不確定', value: stats.maybe,         color: 'text-yellow-400', icon: '🤔' },
         { label: 'LINE 已綁定', value: stats.lineLinked, color: 'text-green-400', icon: '💬' },
+        { label: '出席人數', value: stats.attended || 0, color: 'text-cyan-400', icon: '🟢' },
         { label: '下一場意願', value: stats.nextEvent || 0, color: 'text-amber-400', icon: '⭐' },
     ];
     document.getElementById('statsGrid').innerHTML = cards.map(c => `
@@ -217,6 +224,7 @@ function renderTable() {
     const lf = document.getElementById('lineFilter')?.value || '';
     const sf = document.getElementById('sourceFilter')?.value || '';
     const nf = document.getElementById('nextEventFilter')?.value || '';
+    const at = document.getElementById('attendedFilter')?.value || '';
 
     filteredData = allData.filter(r => {
         const matchSearch = !q || r.name.toLowerCase().includes(q) || r.email.toLowerCase().includes(q);
@@ -224,7 +232,8 @@ function renderTable() {
         const matchLine   = !lf || (lf === 'linked' ? !!r.line_user_id : !r.line_user_id);
         const matchSource = !sf || (r.source || '(未標記)') === sf;
         const matchNext   = !nf || (nf === 'yes' ? !!r.next_event_interested : !r.next_event_interested);
-        return matchSearch && matchAttend && matchLine && matchSource && matchNext;
+        const matchAt     = !at || (at === 'yes' ? !!r.attended : !r.attended);
+        return matchSearch && matchAttend && matchLine && matchSource && matchNext && matchAt;
     });
 
     document.getElementById('countLabel').textContent = `顯示 ${filteredData.length} / ${allData.length} 筆`;
@@ -245,10 +254,11 @@ function renderTable() {
             <td class="text-xs text-slate-400 max-w-[160px]">${formatTags(r.interests, 'purple')}</td>
             <td><input type="text" list="sourceSuggestions" value="${esc(r.source || '')}" onchange="updateSource(${r.id}, this.value)" placeholder="選擇或輸入" class="bg-slate-800 border border-white/10 rounded px-2 py-1 text-xs text-slate-300 w-28"></td>
             <td class="text-center"><input type="checkbox" ${r.next_event_interested ? 'checked' : ''} onchange="updateNextEvent(${r.id}, this.checked)" class="w-4 h-4 cursor-pointer" style="accent-color:#f59e0b;"></td>
+            <td class="text-center"><input type="checkbox" ${r.attended ? 'checked' : ''} onchange="updateAttended(${r.id}, this.checked)" class="w-4 h-4 cursor-pointer" style="accent-color:#22c55e;"></td>
             <td class="text-xs text-slate-500 whitespace-nowrap">${formatDate(r.created_at)}</td>
             <td><button onclick="deleteReg(${r.id}, '${esc(r.name)}')" class="text-red-500 hover:text-red-400 text-xs px-2 py-1 rounded hover:bg-red-500/10 transition-all">刪除</button></td>
         </tr>
-    `).join('') || '<tr><td colspan="12" class="text-center text-slate-600 py-10">沒有符合的報名者</td></tr>';
+    `).join('') || '<tr><td colspan="13" class="text-center text-slate-600 py-10">沒有符合的報名者</td></tr>';
 }
 
 function filterTable() { renderTable(); }
@@ -295,9 +305,11 @@ async function sendReminder(type) {
 }
 
 function exportCSV() {
-    const headers = ['姓名','Email','出席','程度','職業','工具','興趣領域','報名來源','下一場意願','LINE綁定','已訂閱LINE@','報名時間'];
+    const headers = ['姓名','Email','出席意願','實際出席','程度','職業','工具','興趣領域','報名來源','下一場意願','LINE綁定','已訂閱LINE@','報名時間'];
     const rows = filteredData.map(r => [
-        r.name, r.email, r.attendance, r.level, r.job_type, r.tools, r.interests, r.source,
+        r.name, r.email, r.attendance,
+        r.attended ? '是' : '否',
+        r.level, r.job_type, r.tools, r.interests, r.source,
         r.next_event_interested ? '是' : '否',
         r.line_user_id ? '是' : '否', r.subscribe_line === 'yes' ? '是' : '否', r.created_at,
     ].map(v => `"${String(v || '').replace(/"/g, '""')}"`).join(','));
@@ -352,6 +364,15 @@ async function updateNextEvent(id, checked) {
     }
 }
 
+async function updateAttended(id, checked) {
+    const ok = await patchReg(id, { attended: checked });
+    if (ok) {
+        const target = allData.find(r => r.id === id);
+        if (target) target.attended = checked;
+        renderStats(computeStats(allData));
+    }
+}
+
 function computeStats(rows) {
     const bySource = {};
     for (const r of rows) {
@@ -365,6 +386,7 @@ function computeStats(rows) {
         notAttending: rows.filter(r => r.attendance === 'No').length,
         lineLinked:   rows.filter(r => r.line_user_id).length,
         nextEvent:    rows.filter(r => r.next_event_interested).length,
+        attended:     rows.filter(r => r.attended).length,
         bySource,
     };
 }
