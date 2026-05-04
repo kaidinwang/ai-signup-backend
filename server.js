@@ -462,7 +462,7 @@ app.get('/admin/api/binding-stats', adminAuth, async (req, res) => {
 async function sendReminders(type = 'day') {
   const result = await pool.query(`SELECT * FROM registrations WHERE attendance IN ('Yes','Maybe')`);
   const lineMsg = type === 'hour'
-    ? `⏰ 還有 30 分鐘！\n\nAI 共學聚今晚 20:00 即將開始 🚀\n\n📍 Google Meet 連結\nhttps://meet.google.com/tmn-vjmx-qmj\n\n🔔 19:50 開放進入教室（上課前 10 分鐘）\n20:00 準時開始\n\n等等見！🧬`
+    ? `⏰ 還有 30 分鐘！\n\nAI 共學聚今晚 20:00 即將開始 🚀\n\n📍 Google Meet 連結\nhttps://meet.google.com/tmn-vjmx-qmj\n\n🔔 19:50 開放進入教室（上課前 10 分鐘）\n20:00 準時開始\n\n💡 上課前先打開今晚的 AI 工具：Gemini\n👉 https://gemini.google.com\n（用 Google 帳號登入即可，老師會手把手帶你操作 ✋）\n\n等等見！🧬`
     : `📅 明天提醒！\n\nAI 共學聚明天（5/4）晚上 20:00–21:00\n期待明天和大家共學！🧬`;
   const emailSubject = type === 'hour' ? '⏰ AI 共學聚 30 分鐘後開始！Meet 連結在內' : '📅 明天提醒：AI 共學聚';
 
