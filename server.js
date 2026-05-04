@@ -288,13 +288,13 @@ app.get('/line-callback', async (req, res) => {
     if (reg.rows[0]) {
       await pool.query('UPDATE registrations SET line_user_id=$1 WHERE email=$2', [userId, email.toLowerCase()]);
       await sendLine(userId,
-        `AI 共學聚 綁定成功 🎉\n\n${reg.rows[0].name} 你好！\n活動前我們會透過 LINE 提醒你，5/4 見！🧬`
+        `已為你完成綁定 ✅\n\n${reg.rows[0].name} 你好！\n下次活動我們會透過 LINE 通知你 🌱\n（下一場預計 5/18 同一時間）`
       );
       res.redirect('/?bound=success&name=' + encodeURIComponent(reg.rows[0].name));
     } else {
       // 外部報名者（如活動通）：line_bindings 已寫入，回成功頁不要求重填站內表單
       await sendLine(userId,
-        `AI 共學聚 綁定成功 🎉\n\n活動前我們會透過 LINE 提醒你，5/4 見！🧬`
+        `已為你完成綁定 ✅\n\n下次活動我們會透過 LINE 通知你 🌱\n（下一場預計 5/18 同一時間）`
       );
       res.redirect('/?bound=success');
     }
@@ -333,32 +333,12 @@ app.post('/webhook', express.raw({ type: '*/*' }), lineMiddleware, async (req, r
       if (reg.rows[0]) {
         await lineClient.replyMessage(event.replyToken, {
           type: 'text',
-          text: `AI 共學聚 報名確認 🎉\n\n${reg.rows[0].name} 你好！\n你的報名已完成，活動前我們會在這裡提醒你，5/4 線上見！🧬`,
+          text: `歡迎回來，${reg.rows[0].name}！🧬\n\n感謝你參與 5/4 的 AI 共學聚 ❤️\n\n📅 下一場 AI 共學聚預計\n5/18（日）晚上 20:00（同一時間）\n\n詳細課程內容與報名表單會在這裡推播，\n請靜候通知 ✨\n\n— Din 🌱`,
         });
       } else {
         await lineClient.replyMessage(event.replyToken, {
           type: 'text',
-          text: `歡迎加入 宇宙種子 CosmoSeed AI 🧬\n\n這裡會分享：\n・每月共學聚活動通知（下一場 5/4 線上）\n・AI 工具情報與社群動態\n・品牌行銷策略與實戰拆解\n\n👇 已報名的朋友：點下方「我要綁定通知」並傳送你報名的 Email\n👇 還沒報名：點「立即報名活動」`,
-          quickReply: {
-            items: [
-              {
-                type: 'action',
-                action: {
-                  type: 'message',
-                  label: '📌 我要綁定通知',
-                  text: '我要綁定',
-                },
-              },
-              {
-                type: 'action',
-                action: {
-                  type: 'uri',
-                  label: '🆕 立即報名活動',
-                  uri: 'https://ai-signup-backend.onrender.com',
-                },
-              },
-            ],
-          },
+          text: `歡迎加入 宇宙種子 CosmoSeed AI 🧬\n\n感謝你的加入！\n\n📅 下一場 AI 共學聚預計\n5/18（日）晚上 20:00（同一時間）\n\n詳細課程內容與報名表單會在這裡推播給你，\n請靜候通知 ✨\n\n期待下次見！— Din 🌱`,
         });
       }
     }
@@ -390,10 +370,10 @@ app.post('/webhook', express.raw({ type: '*/*' }), lineMiddleware, async (req, r
         const reg = await pool.query('SELECT * FROM registrations WHERE email=$1', [email]);
         if (reg.rows[0]) {
           await pool.query('UPDATE registrations SET line_user_id=$1 WHERE email=$2', [userId, email]);
-          await lineClient.replyMessage(event.replyToken, { type: 'text', text: `AI 共學聚 綁定成功 🎉\n\n${reg.rows[0].name} 你好！\n活動前我們會透過 LINE 提醒你，5/4 見！🧬` });
+          await lineClient.replyMessage(event.replyToken, { type: 'text', text: `已為你完成綁定 ✅\n\n${reg.rows[0].name} 你好！\n下次活動我們會透過 LINE 通知你 🌱\n（下一場預計 5/18 同一時間）` });
         } else {
           // 外部報名者（如活動通）：line_bindings 已寫入，直接通知綁定成功，不要求重填站內表單
-          await lineClient.replyMessage(event.replyToken, { type: 'text', text: `AI 共學聚 綁定成功 🎉\n\n活動前我們會透過 LINE 提醒你，5/4 見！🧬` });
+          await lineClient.replyMessage(event.replyToken, { type: 'text', text: `已為你完成綁定 ✅\n\n下次活動我們會透過 LINE 通知你 🌱\n（下一場預計 5/18 同一時間）` });
         }
       } else {
         await lineClient.replyMessage(event.replyToken, { type: 'text', text: `嗨！請傳送你報名時使用的 Email 給我\n\n例如：yourname@gmail.com` });
