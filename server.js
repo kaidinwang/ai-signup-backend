@@ -431,6 +431,18 @@ app.post('/admin/api/send-reminder', adminAuth, async (req, res) => {
   res.json({ success: true, message: '提醒已發送' });
 });
 
+app.get('/admin/api/broadcast', adminAuth, async (req, res) => {
+  if (!lineClient) return res.status(500).json({ error: 'LINE 未設定' });
+  const lineMsg = `嗨！⏰ 今晚 20:00 AI 共學聚開始 🚀\n\n📍 Google Meet 連結\nhttps://meet.google.com/tmn-vjmx-qmj\n\n🔔 19:50 開放進入教室（上課前 10 分鐘）\n20:00 準時開始\n\n💡 上課前先打開今晚的 AI 工具：Gemini\n👉 https://gemini.google.com\n（用 Google 帳號登入即可，老師會手把手帶你操作 ✋）\n\n等等見！🧬`;
+  try {
+    await lineClient.broadcast({ type: 'text', text: lineMsg });
+    res.json({ success: true, message: 'Broadcast sent to all OA friends', preview: lineMsg });
+  } catch (err) {
+    console.error('[Broadcast Error]', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.get('/admin/api/binding-stats', adminAuth, async (req, res) => {
   const renderRows = await pool.query(`
     SELECT
