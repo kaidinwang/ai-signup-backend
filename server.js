@@ -434,9 +434,9 @@ app.post('/admin/api/send-reminder', adminAuth, async (req, res) => {
 async function sendReminders(type = 'day') {
   const result = await pool.query(`SELECT * FROM registrations WHERE attendance IN ('Yes','Maybe')`);
   const lineMsg = type === 'hour'
-    ? `⏰ 還有 30 分鐘！\n\nAI 共學聚今晚 20:00 即將開始！\n準備好上線，等等見 🚀🧬`
+    ? `⏰ 還有 30 分鐘！\n\nAI 共學聚今晚 20:00 即將開始 🚀\n\n📍 Google Meet 連結\nhttps://meet.google.com/tmn-vjmx-qmj\n\n🔔 19:50 開放進入教室（上課前 10 分鐘）\n20:00 準時開始\n\n等等見！🧬`
     : `📅 明天提醒！\n\nAI 共學聚明天（5/4）晚上 20:00–21:00\n期待明天和大家共學！🧬`;
-  const emailSubject = type === 'hour' ? '⏰ AI 共學聚 30 分鐘後開始！' : '📅 明天提醒：AI 共學聚';
+  const emailSubject = type === 'hour' ? '⏰ AI 共學聚 30 分鐘後開始！Meet 連結在內' : '📅 明天提醒：AI 共學聚';
 
   for (const reg of result.rows) {
     if (reg.line_user_id) {
@@ -444,6 +444,18 @@ async function sendReminders(type = 'day') {
     } else {
       await sendEmail(reg.email, emailSubject, `嗨 ${reg.name}！\n\n${lineMsg}\n\n— AI 共學聚團隊 🧬`);
     }
+  }
+
+  // 外部報名者（如活動通）：line_bindings 有但不在 registrations，純 LINE 提醒
+  const externalBindings = await pool.query(`
+    SELECT lb.line_user_id, lb.display_name
+    FROM line_bindings lb
+    LEFT JOIN registrations r ON lb.email = r.email
+    WHERE r.id IS NULL AND lb.line_user_id IS NOT NULL
+  `);
+  for (const binding of externalBindings.rows) {
+    const greeting = binding.display_name ? `嗨 ${binding.display_name}！\n\n` : '嗨！\n\n';
+    await sendLine(binding.line_user_id, `${greeting}${lineMsg}`);
   }
 }
 
