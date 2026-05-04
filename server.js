@@ -431,6 +431,34 @@ app.post('/admin/api/send-reminder', adminAuth, async (req, res) => {
   res.json({ success: true, message: '提醒已發送' });
 });
 
+app.get('/admin/api/binding-stats', adminAuth, async (req, res) => {
+  const renderRows = await pool.query(`
+    SELECT
+      COUNT(*) FILTER (WHERE attendance IN ('Yes','Maybe')) AS render_attending,
+      COUNT(*) FILTER (WHERE attendance IN ('Yes','Maybe') AND line_user_id IS NOT NULL) AS render_attending_bound
+    FROM registrations
+  `);
+  const externalRows = await pool.query(`
+    SELECT COUNT(*) AS external_bound
+    FROM line_bindings lb
+    LEFT JOIN registrations r ON lb.email = r.email
+    WHERE r.id IS NULL
+  `);
+  const r = renderRows.rows[0];
+  const e = externalRows.rows[0];
+  res.json({
+    render: {
+      attending: parseInt(r.render_attending),
+      bound: parseInt(r.render_attending_bound),
+      unbound: parseInt(r.render_attending) - parseInt(r.render_attending_bound),
+    },
+    external: {
+      bound: parseInt(e.external_bound),
+      note: '純活動通沒綁的人不在 DB，需用「活動通總報名數 − bound」推算',
+    },
+  });
+});
+
 async function sendReminders(type = 'day') {
   const result = await pool.query(`SELECT * FROM registrations WHERE attendance IN ('Yes','Maybe')`);
   const lineMsg = type === 'hour'
