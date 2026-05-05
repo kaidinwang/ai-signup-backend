@@ -174,14 +174,14 @@ app.post('/register', async (req, res) => {
     if (reg.line_user_id) {
       // 已綁 LINE → 推 LINE 提醒
       await sendLine(reg.line_user_id,
-        `嗨 ${reg.name}！\n\n你剛才嘗試再次報名 AI 共學聚 👀\n\n你已經報名過了，不用重複填喔！\n\n📅 5/4（一）20:00–21:00 線上見 🧬`
+        `嗨 ${reg.name}！\n\n你之前已報名過 5/4 共學聚 ✅\n5/4 已圓滿結束 ❤️\n\n下一場預計 5/18（日）20:00，\n正式報名開放時會在這裡通知你 🧬`
       );
     } else {
       // 未綁 LINE → Email 提醒並鼓勵加入 LINE@
       await sendEmail(
         email,
         '📋 你已報名 AI 共學聚！',
-        `嗨 ${reg.name}！\n\n你已經報名過 AI 共學聚了，不需要重複填寫 ✅\n\n📅 活動時間：5/4（一）20:00–21:00\n\n📲 還沒加入我們的 LINE@ 嗎？\n掃描表單上的 QR Code 加入，活動前會自動提醒你！\n\n— AI 共學聚團隊 🧬`
+        `嗨 ${reg.name}！\n\n你之前已報名過 5/4 共學聚 ✅\n5/4 場次已圓滿結束。\n\n下一場預計 5/18（日）20:00–21:00，\n正式報名開放時會通知你！\n\n📲 還沒加入 LINE OA 嗎？\n👉 https://lin.ee/9WduU6Y\n下一場活動詳情會優先在 LINE 通知！\n\n— AI 共學聚團隊 🧬`
       );
     }
     return res.json({ success: false, duplicate: true, name: reg.name, attendance: reg.attendance });
@@ -217,13 +217,13 @@ app.post('/register', async (req, res) => {
       email,
       isGoing ? '✅ AI 共學聚 — 報名確認' : 'AI 共學聚 — 感謝填寫！',
       isGoing
-        ? `嗨 ${name}！\n\n你已成功報名 AI 共學聚 🎉\n\n📅 時間：5/4（一）20:00 – 21:00\n📍 線上直播\n\n我們會在活動前一天和活動前 30 分鐘再次提醒你，記得準時上線！\n\n— AI 共學聚團隊 🧬`
-        : `嗨 ${name}！\n\n感謝你填寫報名表單！我們會通知你下次活動資訊 📅\n\n— AI 共學聚團隊 🧬`
+        ? `嗨 ${name}！\n\n感謝你的填寫 🌱\n\n5/4 AI 共學聚已圓滿結束。\n下一場預計 5/18（日）20:00 線上直播，\n正式報名連結尚未開放。\n\n📲 加入 LINE OA：https://lin.ee/9WduU6Y\n下一場開放報名時會第一時間透過 LINE 通知你！\n\n— AI 共學聚團隊 🧬`
+        : `嗨 ${name}！\n\n感謝你填寫表單！下一場活動開放報名時會通知你 📅\n\n— AI 共學聚團隊 🧬`
     );
 
     if (binding.rows[0]?.line_user_id) {
       sendLine(binding.rows[0].line_user_id,
-        `嗨 ${name}！報名成功 🎉\n\n📅 5/4（一）20:00–21:00\n活動前會再提醒你，到時見！🧬`);
+        `嗨 ${name}！\n\n感謝你的填寫 🌱\n5/4 共學聚已結束。\n下一場預計 5/18（日）20:00，正式報名開放時會在這裡通知你 🧬`);
     }
   } catch (err) {
     console.error('[Register Error]', err.message);
@@ -333,7 +333,7 @@ app.post('/webhook', express.raw({ type: '*/*' }), lineMiddleware, async (req, r
       if (reg.rows[0]) {
         await lineClient.replyMessage(event.replyToken, {
           type: 'text',
-          text: `歡迎回來，${reg.rows[0].name}！🧬\n\n感謝你參與 5/4 的 AI 共學聚 ❤️\n\n📅 下一場 AI 共學聚預計\n5/18（日）晚上 20:00（同一時間）\n\n詳細課程內容與報名表單會在這裡推播，\n請靜候通知 ✨\n\n— Din 🌱`,
+          text: `歡迎回來，${reg.rows[0].name}！🧬\n\n📅 下一場 AI 共學聚預計\n5/18（日）晚上 20:00（同一時間）\n\n詳細課程內容與報名表單會在這裡推播，\n請靜候通知 ✨\n\n— Din 🌱`,
         });
       } else {
         await lineClient.replyMessage(event.replyToken, {
@@ -448,10 +448,11 @@ app.post('/admin/api/send-reminder', adminAuth, async (req, res) => {
 
 app.get('/admin/api/broadcast', adminAuth, async (req, res) => {
   if (!lineClient) return res.status(500).json({ error: 'LINE 未設定' });
-  const lineMsg = `嗨！⏰ 今晚 20:00 AI 共學聚開始 🚀\n\n📍 Google Meet 連結\nhttps://meet.google.com/tmn-vjmx-qmj\n\n🔔 19:50 開放進入教室（上課前 10 分鐘）\n20:00 準時開始\n\n💡 上課前先打開今晚的 AI 工具：Gemini\n👉 https://gemini.google.com\n（用 Google 帳號登入即可，老師會手把手帶你操作 ✋）\n\n等等見！🧬`;
+  const msg = req.query.msg;
+  if (!msg) return res.status(400).json({ error: 'Missing ?msg= query parameter (URL-encoded text)' });
   try {
-    await lineClient.broadcast({ type: 'text', text: lineMsg });
-    res.json({ success: true, message: 'Broadcast sent to all OA friends', preview: lineMsg });
+    await lineClient.broadcast({ type: 'text', text: msg });
+    res.json({ success: true, message: 'Broadcast sent to all OA friends', preview: msg });
   } catch (err) {
     console.error('[Broadcast Error]', err.message);
     res.status(500).json({ error: err.message });
@@ -488,10 +489,11 @@ app.get('/admin/api/binding-stats', adminAuth, async (req, res) => {
 
 async function sendReminders(type = 'day') {
   const result = await pool.query(`SELECT * FROM registrations WHERE attendance IN ('Yes','Maybe')`);
+  // ⚠️ 下一場活動前(5/18 前)請主辦人更新此處的 Meet 連結與當晚 AI 工具準備事項
   const lineMsg = type === 'hour'
-    ? `⏰ 還有 30 分鐘！\n\nAI 共學聚今晚 20:00 即將開始 🚀\n\n📍 Google Meet 連結\nhttps://meet.google.com/tmn-vjmx-qmj\n\n🔔 19:50 開放進入教室（上課前 10 分鐘）\n20:00 準時開始\n\n💡 上課前先打開今晚的 AI 工具：Gemini\n👉 https://gemini.google.com\n（用 Google 帳號登入即可，老師會手把手帶你操作 ✋）\n\n等等見！🧬`
-    : `📅 明天提醒！\n\nAI 共學聚明天（5/4）晚上 20:00–21:00\n期待明天和大家共學！🧬`;
-  const emailSubject = type === 'hour' ? '⏰ AI 共學聚 30 分鐘後開始！Meet 連結在內' : '📅 明天提醒：AI 共學聚';
+    ? `⏰ 還有 30 分鐘！\n\nAI 共學聚今晚 20:00 即將開始 🚀\n\nMeet 連結與上課準備事項，請查看前一則 LINE 通知 📌\n\n🔔 19:50 開放進入教室\n20:00 準時開始\n\n等等見！🧬`
+    : `📅 明天提醒！\n\nAI 共學聚明天晚上 20:00–21:00\n期待明天和大家共學！🧬`;
+  const emailSubject = type === 'hour' ? '⏰ AI 共學聚 30 分鐘後開始！' : '📅 明天提醒：AI 共學聚';
 
   for (const reg of result.rows) {
     if (reg.line_user_id) {
@@ -514,8 +516,11 @@ async function sendReminders(type = 'day') {
   }
 }
 
-cron.schedule('0 20 3 5 *',  () => sendReminders('day'),  { timezone: 'Asia/Taipei' });
-cron.schedule('30 19 4 5 *', () => sendReminders('hour'), { timezone: 'Asia/Taipei' });
+// 5/4 已結束。下一場 5/18：前一天 5/17 20:00 day 提醒、當天 5/18 19:30 hour 提醒
+// ⚠️ 5/18 活動前請先用 broadcast 發出 Meet 連結 + 當晚 AI 工具準備事項，
+//    這兩個 cron 訊息只是 30 分鐘提醒，會引導用戶看「前一則 LINE 通知」找連結
+cron.schedule('0 20 17 5 *',  () => sendReminders('day'),  { timezone: 'Asia/Taipei' });
+cron.schedule('30 19 18 5 *', () => sendReminders('hour'), { timezone: 'Asia/Taipei' });
 
 // ─── Start ───────────────────────────────────────────────────────────────────
 const PORT = process.env.PORT || 3000;
