@@ -48,6 +48,17 @@ app.use((req, res, next) => {
   if (req.path === '/webhook') return next();
   express.json()(req, res, next);
 });
+// 5/4 結束後關閉公開報名頁，主辦人帶 ?preview=ADMIN_PASSWORD 才能看完整表單
+app.use((req, res, next) => {
+  if (req.path === '/' || req.path === '/index.html') {
+    const previewPw = req.query.preview;
+    const validPasswords = (process.env.ADMIN_PASSWORD || '').split(',').map(p => p.trim()).filter(Boolean);
+    if (!previewPw || !validPasswords.includes(previewPw)) {
+      return res.sendFile(path.join(__dirname, 'public', 'coming-soon.html'));
+    }
+  }
+  next();
+});
 app.use(express.static(path.join(__dirname, 'public')));
 
 // ─── Database (PostgreSQL) ───────────────────────────────────────────────────
