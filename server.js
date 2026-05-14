@@ -359,6 +359,83 @@ async function forwardToStockSystem(body) {
   }
 }
 
+// 歡迎訊息的 Flex Carousel（工具箱 + 課程）
+const WELCOME_CAROUSEL = {
+  type: 'flex',
+  altText: '歡迎加入 宇宙種子 CosmoSeed AI！打開工具箱 + 看課程 →',
+  contents: {
+    type: 'carousel',
+    contents: [
+      {
+        type: 'bubble',
+        size: 'kilo',
+        header: {
+          type: 'box',
+          layout: 'vertical',
+          contents: [{ type: 'text', text: '🧰', size: '5xl', align: 'center', color: '#F4C430' }],
+          backgroundColor: '#1A3A5F',
+          paddingAll: 'xxl',
+        },
+        body: {
+          type: 'box',
+          layout: 'vertical',
+          contents: [
+            { type: 'text', text: 'AI 工具箱', weight: 'bold', size: 'xl', color: '#1A3A5F' },
+            { type: 'text', text: '100% 繁中・免費使用', size: 'sm', color: '#888888', margin: 'sm' },
+            { type: 'text', text: '我親自篩選 + 評分的品牌行銷利器，附「使用情境 × 建議流程」', size: 'xs', color: '#666666', wrap: true, margin: 'md' },
+          ],
+          paddingAll: 'lg',
+        },
+        footer: {
+          type: 'box',
+          layout: 'vertical',
+          contents: [{
+            type: 'button',
+            style: 'primary',
+            color: '#1A3A5F',
+            action: { type: 'uri', label: '立即開啟 →', uri: 'https://cosmoseed.com.tw' },
+          }],
+          paddingAll: 'lg',
+          paddingTop: 'none',
+        },
+      },
+      {
+        type: 'bubble',
+        size: 'kilo',
+        header: {
+          type: 'box',
+          layout: 'vertical',
+          contents: [{ type: 'text', text: '📅', size: '5xl', align: 'center', color: '#FFD700' }],
+          backgroundColor: '#4A2B7A',
+          paddingAll: 'xxl',
+        },
+        body: {
+          type: 'box',
+          layout: 'vertical',
+          contents: [
+            { type: 'text', text: 'AI 共學聚', weight: 'bold', size: 'xl', color: '#4A2B7A' },
+            { type: 'text', text: '每月 2 次・線上活動', size: 'sm', color: '#888888', margin: 'sm' },
+            { type: 'text', text: 'Claude × 品牌行銷 × AI 工作流實戰', size: 'xs', color: '#666666', wrap: true, margin: 'md' },
+          ],
+          paddingAll: 'lg',
+        },
+        footer: {
+          type: 'box',
+          layout: 'vertical',
+          contents: [{
+            type: 'button',
+            style: 'primary',
+            color: '#4A2B7A',
+            action: { type: 'uri', label: '看課程詳情 →', uri: 'https://event.cosmoseed.com.tw/courses' },
+          }],
+          paddingAll: 'lg',
+          paddingTop: 'none',
+        },
+      },
+    ],
+  },
+};
+
 app.post('/webhook', express.raw({ type: '*/*' }), lineMiddleware, async (req, res) => {
   res.sendStatus(200);
   const body = Buffer.isBuffer(req.body) ? JSON.parse(req.body.toString()) : req.body;
@@ -368,28 +445,26 @@ app.post('/webhook', express.raw({ type: '*/*' }), lineMiddleware, async (req, r
       const userId = event.source.userId;
       const reg = await pool.query('SELECT name FROM registrations WHERE line_user_id=$1', [userId]);
       if (reg.rows[0]) {
-        await lineClient.replyMessage(event.replyToken, {
-          type: 'text',
-          text: `歡迎回來，${reg.rows[0].name}！🧬\n\n🧰 AI 工具箱已上線（持續更新中）\nhttps://cosmoseed.com.tw\n\n📅 每月 2 次 AI 共學聚\n請點選最新課程報名\nhttps://event.cosmoseed.com.tw/courses\n\n— Din 🌱`,
-          quickReply: {
-            items: [
-              { type: 'action', action: { type: 'uri', label: '🧰 開啟工具箱', uri: 'https://cosmoseed.com.tw' } },
-              { type: 'action', action: { type: 'uri', label: '📅 看課程詳情', uri: 'https://event.cosmoseed.com.tw/courses' } },
-            ],
+        await lineClient.replyMessage(event.replyToken, [
+          {
+            type: 'text',
+            text: `歡迎回來，${reg.rows[0].name}！🧬\n\n— Din 🌱`,
           },
-        });
+          WELCOME_CAROUSEL,
+        ]);
       } else {
-        await lineClient.replyMessage(event.replyToken, {
-          type: 'text',
-          text: `歡迎加入 宇宙種子 CosmoSeed AI 🧬\n\n幫品牌行銷人準備了見面禮 🎁\n\n🧰【AI 工具箱】100% 繁中、免費使用\n我親自篩選 + 評分的行銷利器\n附「使用情境 × 建議流程」\n省下你找工具、試錯的時間\n\n👉 立即開啟\nhttps://cosmoseed.com.tw\n\n────\n\n📅 每月 2 次 AI 共學聚\n請點選最新課程報名\nhttps://event.cosmoseed.com.tw/courses\n\n— Din 🌱`,
-          quickReply: {
-            items: [
-              { type: 'action', action: { type: 'uri', label: '🧰 開啟工具箱', uri: 'https://cosmoseed.com.tw' } },
-              { type: 'action', action: { type: 'uri', label: '📅 看課程詳情', uri: 'https://event.cosmoseed.com.tw/courses' } },
-              { type: 'action', action: { type: 'message', label: '📌 我要綁定通知', text: '我要綁定' } },
-            ],
+        await lineClient.replyMessage(event.replyToken, [
+          {
+            type: 'text',
+            text: `歡迎加入 宇宙種子 CosmoSeed AI 🧬\n\n幫品牌行銷人準備了見面禮 🎁\n\n下面兩張卡片：\n→ 左滑看「課程」\n\n— Din 🌱`,
+            quickReply: {
+              items: [
+                { type: 'action', action: { type: 'message', label: '📌 我要綁定通知', text: '我要綁定' } },
+              ],
+            },
           },
-        });
+          WELCOME_CAROUSEL,
+        ]);
       }
     }
     if (event.type === 'message' && event.message.type === 'text') {
