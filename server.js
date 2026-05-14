@@ -116,11 +116,15 @@ async function initDB() {
   const backfilled = await pool.query(`UPDATE registrations SET event_date='2026-05-04' WHERE event_date IS NULL RETURNING id`);
   if (backfilled.rowCount > 0) console.log(`[DB] Backfilled event_date='2026-05-04' for ${backfilled.rowCount} legacy row(s)`);
   // Migration: 把 UNIQUE(email) 改成 UNIQUE(email, event_date)，讓同一 email 在不同場次有獨立 row（像訂單）
+  // 用 pg_constraint 預先檢查，避免 constraint/index 殘留導致 duplicate_table error
   await pool.query(`ALTER TABLE registrations DROP CONSTRAINT IF EXISTS registrations_email_key`);
   await pool.query(`
     DO $$ BEGIN
-      ALTER TABLE registrations ADD CONSTRAINT registrations_email_event_unique UNIQUE (email, event_date);
-    EXCEPTION WHEN duplicate_object THEN NULL;
+      IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint WHERE conname = 'registrations_email_event_unique'
+      ) THEN
+        ALTER TABLE registrations ADD CONSTRAINT registrations_email_event_unique UNIQUE (email, event_date);
+      END IF;
     END $$;
   `);
   // 一次性修復：把所有 email 統一轉小寫，避免 LINE 綁定對不上
