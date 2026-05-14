@@ -276,6 +276,8 @@
             flex-shrink: 0;
         }
         .brand-mark i { color: #fff; font-size: 22px; }
+        .brand-mark svg.bolt-sharp { width: 26px; height: 26px; display: block; }
+        .brand-mark svg.bolt-sharp path { fill: #fff; stroke: none; }
 
         /* FAQ */
         .faq-item {
@@ -732,7 +734,11 @@
     <!-- About CosmoSeed -->
     <section class="glass-card rounded-3xl p-7 md:p-9 space-y-6">
         <div class="flex items-center gap-3">
-            <span class="brand-mark"><i class="fas fa-bolt"></i></span>
+            <span class="brand-mark" aria-label="CosmoSeed logo">
+                <svg class="bolt-sharp" viewBox="0 0 32 32" aria-hidden="true">
+                    <path d="M18.5 2 L6 17.5 L14 17.5 L12 30 L26 13 L17 13 L18.5 2 Z"/>
+                </svg>
+            </span>
             <h2 class="display-font text-xl md:text-2xl font-bold text-white">關於 宇宙種子 CosmoSeed AI</h2>
         </div>
         <p class="text-slate-300 text-[15px] leading-[1.85]">
