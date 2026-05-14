@@ -366,32 +366,23 @@ async function forwardToStockSystem(body) {
   }
 }
 
-// 歡迎訊息的 Flex Carousel（工具箱 + 課程）
+// 歡迎訊息的 Flex Carousel（工具箱 + 課程，hero 用既有設計圖）
 const WELCOME_CAROUSEL = {
   type: 'flex',
-  altText: '歡迎加入 宇宙種子 CosmoSeed AI！打開工具箱 + 看課程 →',
+  altText: '歡迎加入 宇宙種子 CosmoSeed AI！工具箱 + 課程 →',
   contents: {
     type: 'carousel',
     contents: [
       {
         type: 'bubble',
         size: 'kilo',
-        header: {
-          type: 'box',
-          layout: 'vertical',
-          contents: [{ type: 'text', text: '🧰', size: '5xl', align: 'center', color: '#F4C430' }],
-          backgroundColor: '#1A3A5F',
-          paddingAll: 'xxl',
-        },
-        body: {
-          type: 'box',
-          layout: 'vertical',
-          contents: [
-            { type: 'text', text: 'AI 工具箱', weight: 'bold', size: 'xl', color: '#1A3A5F' },
-            { type: 'text', text: '100% 繁中・免費使用', size: 'sm', color: '#888888', margin: 'sm' },
-            { type: 'text', text: '我親自篩選 + 評分的品牌行銷利器，附「使用情境 × 建議流程」', size: 'xs', color: '#666666', wrap: true, margin: 'md' },
-          ],
-          paddingAll: 'lg',
+        hero: {
+          type: 'image',
+          url: 'https://cosmoseed-ai-toolbox.netlify.app/og-image.png?v=2',
+          size: 'full',
+          aspectRatio: '8:5',
+          aspectMode: 'cover',
+          action: { type: 'uri', uri: 'https://cosmoseed.com.tw' },
         },
         footer: {
           type: 'box',
@@ -399,32 +390,23 @@ const WELCOME_CAROUSEL = {
           contents: [{
             type: 'button',
             style: 'primary',
-            color: '#1A3A5F',
-            action: { type: 'uri', label: '立即開啟 →', uri: 'https://cosmoseed.com.tw' },
+            color: '#C2185B',
+            height: 'sm',
+            action: { type: 'uri', label: '立即開啟工具箱 →', uri: 'https://cosmoseed.com.tw' },
           }],
-          paddingAll: 'lg',
-          paddingTop: 'none',
+          paddingAll: 'md',
         },
       },
       {
         type: 'bubble',
         size: 'kilo',
-        header: {
-          type: 'box',
-          layout: 'vertical',
-          contents: [{ type: 'text', text: '📅', size: '5xl', align: 'center', color: '#FFD700' }],
-          backgroundColor: '#4A2B7A',
-          paddingAll: 'xxl',
-        },
-        body: {
-          type: 'box',
-          layout: 'vertical',
-          contents: [
-            { type: 'text', text: 'AI 共學聚', weight: 'bold', size: 'xl', color: '#4A2B7A' },
-            { type: 'text', text: '每月 2 次・線上活動', size: 'sm', color: '#888888', margin: 'sm' },
-            { type: 'text', text: 'Claude × 品牌行銷 × AI 工作流實戰', size: 'xs', color: '#666666', wrap: true, margin: 'md' },
-          ],
-          paddingAll: 'lg',
+        hero: {
+          type: 'image',
+          url: 'https://event.cosmoseed.com.tw/banner.png',
+          size: 'full',
+          aspectRatio: '2:1',
+          aspectMode: 'cover',
+          action: { type: 'uri', uri: 'https://event.cosmoseed.com.tw/courses' },
         },
         footer: {
           type: 'box',
@@ -432,11 +414,11 @@ const WELCOME_CAROUSEL = {
           contents: [{
             type: 'button',
             style: 'primary',
-            color: '#4A2B7A',
+            color: '#E55A1F',
+            height: 'sm',
             action: { type: 'uri', label: '看課程詳情 →', uri: 'https://event.cosmoseed.com.tw/courses' },
           }],
-          paddingAll: 'lg',
-          paddingTop: 'none',
+          paddingAll: 'md',
         },
       },
     ],
