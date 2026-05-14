@@ -48,17 +48,6 @@ app.use((req, res, next) => {
   if (req.path === '/webhook') return next();
   express.json()(req, res, next);
 });
-// 5/4 結束後關閉公開報名頁，主辦人帶 ?preview=ADMIN_PASSWORD 才能看完整表單
-app.use((req, res, next) => {
-  if (req.path === '/' || req.path === '/index.html') {
-    const previewPw = req.query.preview;
-    const validPasswords = (process.env.ADMIN_PASSWORD || '').split(',').map(p => p.trim()).filter(Boolean);
-    if (!previewPw || !validPasswords.includes(previewPw)) {
-      return res.sendFile(path.join(__dirname, 'public', 'coming-soon.html'));
-    }
-  }
-  next();
-});
 app.use(express.static(path.join(__dirname, 'public')));
 
 // ─── Database (PostgreSQL) ───────────────────────────────────────────────────
@@ -185,14 +174,14 @@ app.post('/register', async (req, res) => {
     if (reg.line_user_id) {
       // 已綁 LINE → 推 LINE 提醒
       await sendLine(reg.line_user_id,
-        `嗨 ${reg.name}！\n\n你之前已報名過 5/4 共學聚 ✅\n5/4 已圓滿結束 ❤️\n\n下一場預計 5/18（日）20:00，\n正式報名開放時會在這裡通知你 🧬`
+        `嗨 ${reg.name}！\n\n你已報名 5/18 AI 共學聚 ✅\n\n📅 5/18（一）20:00–21:30 線上見\n📌 主題：Claude Skills × Projects 入門實戰\n\n活動前 24 小時 + 30 分鐘會在這裡提醒你 🧬`
       );
     } else {
       // 未綁 LINE → Email 提醒並鼓勵加入 LINE@
       await sendEmail(
         email,
         '📋 你已報名 AI 共學聚！',
-        `嗨 ${reg.name}！\n\n你之前已報名過 5/4 共學聚 ✅\n5/4 場次已圓滿結束。\n\n下一場預計 5/18（日）20:00–21:00，\n正式報名開放時會通知你！\n\n📲 還沒加入 LINE OA 嗎？\n👉 https://lin.ee/9WduU6Y\n下一場活動詳情會優先在 LINE 通知！\n\n— AI 共學聚團隊 🧬`
+        `嗨 ${reg.name}！\n\n你已報名 5/18 AI 共學聚 ✅\n\n📅 5/18（一）20:00–21:30 線上\n📌 主題：Claude Skills × Projects 入門實戰，打造你的 AI 內容工作流\n\n📲 還沒加入 LINE OA 嗎？\n👉 https://lin.ee/9WduU6Y\nMeet 連結與活動提醒會優先在 LINE 通知！\n\n— AI 共學聚團隊 🧬`
       );
     }
     return res.json({ success: false, duplicate: true, name: reg.name, attendance: reg.attendance });
@@ -226,15 +215,15 @@ app.post('/register', async (req, res) => {
     const isGoing = attendance === 'Yes' || attendance === 'Maybe';
     sendEmail(
       email,
-      isGoing ? '✅ AI 共學聚 — 報名確認' : 'AI 共學聚 — 感謝填寫！',
+      isGoing ? '✅ AI 共學聚 — 5/18 報名確認' : 'AI 共學聚 — 感謝填寫！',
       isGoing
-        ? `嗨 ${name}！\n\n感謝你的填寫 🌱\n\n5/4 AI 共學聚已圓滿結束。\n下一場預計 5/18（日）20:00 線上直播，\n正式報名連結尚未開放。\n\n📲 加入 LINE OA：https://lin.ee/9WduU6Y\n下一場開放報名時會第一時間透過 LINE 通知你！\n\n— AI 共學聚團隊 🧬`
-        : `嗨 ${name}！\n\n感謝你填寫表單！下一場活動開放報名時會通知你 📅\n\n— AI 共學聚團隊 🧬`
+        ? `嗨 ${name}！\n\n感謝你報名 5/18 AI 共學聚 🌱\n\n📅 5/18（一）20:00–21:30 線上\n📌 主題：Claude Skills × Projects 入門實戰，打造你的 AI 內容工作流\n\n📲 加入 LINE OA：https://lin.ee/9WduU6Y\nMeet 連結會在活動前 24 小時 + 30 分鐘透過 LINE 通知你！\n\n— AI 共學聚團隊 🧬`
+        : `嗨 ${name}！\n\n感謝你填寫表單！下一場 5/18 開課，若之後想參加歡迎再回來填一次 📅\n\n— AI 共學聚團隊 🧬`
     );
 
     if (binding.rows[0]?.line_user_id) {
       sendLine(binding.rows[0].line_user_id,
-        `嗨 ${name}！\n\n感謝你的填寫 🌱\n5/4 共學聚已結束。\n下一場預計 5/18（日）20:00，正式報名開放時會在這裡通知你 🧬`);
+        `嗨 ${name}！\n\n你已報名 5/18 AI 共學聚 ✅\n\n📅 5/18（一）20:00–21:30 線上見\n📌 主題：Claude Skills × Projects 入門實戰\n\n活動前會在這裡提醒你 🧬`);
     }
   } catch (err) {
     console.error('[Register Error]', err.message);
@@ -299,13 +288,13 @@ app.get('/line-callback', async (req, res) => {
     if (reg.rows[0]) {
       await pool.query('UPDATE registrations SET line_user_id=$1 WHERE email=$2', [userId, email.toLowerCase()]);
       await sendLine(userId,
-        `已為你完成綁定 ✅\n\n${reg.rows[0].name} 你好！\n下次活動我們會透過 LINE 通知你 🌱\n（下一場預計 5/18 同一時間）`
+        `已為你完成綁定 ✅\n\n${reg.rows[0].name} 你好！\n5/18（一）20:00 AI 共學聚見 🌱\nMeet 連結與提醒會在這裡通知你`
       );
       res.redirect('/?bound=success&name=' + encodeURIComponent(reg.rows[0].name));
     } else {
       // 外部報名者（如活動通）：line_bindings 已寫入，回成功頁不要求重填站內表單
       await sendLine(userId,
-        `已為你完成綁定 ✅\n\n下次活動我們會透過 LINE 通知你 🌱\n（下一場預計 5/18 同一時間）`
+        `已為你完成綁定 ✅\n\n5/18（一）20:00 AI 共學聚見 🌱\nMeet 連結與提醒會在這裡通知你`
       );
       res.redirect('/?bound=success');
     }
@@ -344,12 +333,12 @@ app.post('/webhook', express.raw({ type: '*/*' }), lineMiddleware, async (req, r
       if (reg.rows[0]) {
         await lineClient.replyMessage(event.replyToken, {
           type: 'text',
-          text: `歡迎回來，${reg.rows[0].name}！🧬\n\n📅 下一場 AI 共學聚預計\n5/18（日）晚上 20:00（同一時間）\n\n詳細課程內容與報名表單會在這裡推播，\n請靜候通知 ✨\n\n— Din 🌱`,
+          text: `歡迎回來，${reg.rows[0].name}！🧬\n\n📅 下一場 AI 共學聚\n5/18（一）20:00–21:30 線上\n\n📌 主題：Claude Skills × Projects 入門實戰\n　　　打造你的 AI 內容工作流\n\nMeet 連結與活動提醒會在這裡通知你 ✨\n\n— Din 🌱`,
         });
       } else {
         await lineClient.replyMessage(event.replyToken, {
           type: 'text',
-          text: `歡迎加入 宇宙種子 CosmoSeed AI 🧬\n\n感謝你的加入！\n\n📅 下一場 AI 共學聚預計\n5/18（日）晚上 20:00（同一時間）\n\n詳細課程內容與報名表單會在這裡推播給你，\n請靜候通知 ✨\n\n期待下次見！— Din 🌱`,
+          text: `歡迎加入 宇宙種子 CosmoSeed AI 🧬\n\n感謝你的加入！\n\n📅 下一場 AI 共學聚\n5/18（一）20:00–21:30 線上\n\n📌 主題：Claude Skills × Projects 入門實戰\n　　　打造你的 AI 內容工作流\n\n👉 報名連結：https://ai-signup-backend.onrender.com/\n\nMeet 連結與活動提醒會在這裡通知你 ✨\n\n期待 5/18 見！— Din 🌱`,
         });
       }
     }
@@ -381,10 +370,10 @@ app.post('/webhook', express.raw({ type: '*/*' }), lineMiddleware, async (req, r
         const reg = await pool.query('SELECT * FROM registrations WHERE email=$1', [email]);
         if (reg.rows[0]) {
           await pool.query('UPDATE registrations SET line_user_id=$1 WHERE email=$2', [userId, email]);
-          await lineClient.replyMessage(event.replyToken, { type: 'text', text: `已為你完成綁定 ✅\n\n${reg.rows[0].name} 你好！\n下次活動我們會透過 LINE 通知你 🌱\n（下一場預計 5/18 同一時間）` });
+          await lineClient.replyMessage(event.replyToken, { type: 'text', text: `已為你完成綁定 ✅\n\n${reg.rows[0].name} 你好！\n5/18（一）20:00 AI 共學聚見 🌱\nMeet 連結與提醒會在這裡通知你` });
         } else {
           // 外部報名者（如活動通）：line_bindings 已寫入，直接通知綁定成功，不要求重填站內表單
-          await lineClient.replyMessage(event.replyToken, { type: 'text', text: `已為你完成綁定 ✅\n\n下次活動我們會透過 LINE 通知你 🌱\n（下一場預計 5/18 同一時間）` });
+          await lineClient.replyMessage(event.replyToken, { type: 'text', text: `已為你完成綁定 ✅\n\n5/18（一）20:00 AI 共學聚見 🌱\nMeet 連結與提醒會在這裡通知你` });
         }
       } else {
         await lineClient.replyMessage(event.replyToken, { type: 'text', text: `嗨！請傳送你報名時使用的 Email 給我\n\n例如：yourname@gmail.com` });
@@ -502,8 +491,8 @@ async function sendReminders(type = 'day') {
   const result = await pool.query(`SELECT * FROM registrations WHERE attendance IN ('Yes','Maybe')`);
   // ⚠️ 下一場活動前(5/18 前)請主辦人更新此處的 Meet 連結與當晚 AI 工具準備事項
   const lineMsg = type === 'hour'
-    ? `⏰ 還有 30 分鐘！\n\nAI 共學聚今晚 20:00 即將開始 🚀\n\nMeet 連結與上課準備事項，請查看前一則 LINE 通知 📌\n\n🔔 19:50 開放進入教室\n20:00 準時開始\n\n等等見！🧬`
-    : `📅 明天提醒！\n\nAI 共學聚明天晚上 20:00–21:00\n期待明天和大家共學！🧬`;
+    ? `⏰ 還有 30 分鐘！\n\nAI 共學聚今晚 20:00 即將開始 🚀\n📌 Claude Skills × Projects 入門實戰\n\nMeet 連結與上課準備事項，請查看前一則 LINE 通知 📌\n\n🔔 19:50 開放進入教室\n20:00 準時開始（21:30 結束）\n\n等等見！🧬`
+    : `📅 明天提醒！\n\nAI 共學聚明天晚上 20:00–21:30\n📌 Claude Skills × Projects 入門實戰\n　　打造你的 AI 內容工作流\n\n期待明天和大家共學！🧬`;
   const emailSubject = type === 'hour' ? '⏰ AI 共學聚 30 分鐘後開始！' : '📅 明天提醒：AI 共學聚';
 
   for (const reg of result.rows) {
@@ -527,9 +516,9 @@ async function sendReminders(type = 'day') {
   }
 }
 
-// 5/4 已結束。下一場 5/18：前一天 5/17 20:00 day 提醒、當天 5/18 19:30 hour 提醒
-// ⚠️ 5/18 活動前請先用 broadcast 發出 Meet 連結 + 當晚 AI 工具準備事項，
-//    這兩個 cron 訊息只是 30 分鐘提醒，會引導用戶看「前一則 LINE 通知」找連結
+// 5/18 活動：前一天 5/17 20:00 day 提醒、當天 5/18 19:30 hour 提醒
+// ⚠️ 5/18 活動前（建議 18:00–19:00）請先用 /admin/api/broadcast?msg= 發出 Meet 連結 + AI 工具準備事項，
+//    這兩個 cron 訊息只是時間提醒，會引導用戶看「前一則 LINE 通知」找連結
 cron.schedule('0 20 17 5 *',  () => sendReminders('day'),  { timezone: 'Asia/Taipei' });
 cron.schedule('30 19 18 5 *', () => sendReminders('hour'), { timezone: 'Asia/Taipei' });
 
