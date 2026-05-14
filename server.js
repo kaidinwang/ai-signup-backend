@@ -62,7 +62,7 @@ app.use((req, res, next) => {
   next();
 });
 
-app.use(express.static(path.join(__dirname, 'public')));
+app.use(express.static(path.join(__dirname, 'public'), { extensions: ['html'] }));
 
 // ─── Database (PostgreSQL) ───────────────────────────────────────────────────
 const pool = new Pool({
@@ -359,12 +359,25 @@ app.post('/webhook', express.raw({ type: '*/*' }), lineMiddleware, async (req, r
       if (reg.rows[0]) {
         await lineClient.replyMessage(event.replyToken, {
           type: 'text',
-          text: `歡迎回來，${reg.rows[0].name}！🧬\n\n📅 下一場 AI 共學聚\n5/18（一）20:00–21:30 線上\n\n📌 主題：Claude Skills × Projects 入門實戰\n　　　打造你的 AI 內容工作流\n\nMeet 連結與活動提醒會在這裡通知你 ✨\n\n— Din 🌱`,
+          text: `歡迎回來，${reg.rows[0].name}！🧬\n\n🧰 AI 工具箱已上線（持續更新中）\nhttps://cosmoseed.com.tw\n\n📅 每月 2 次 AI 共學聚\n請點選最新課程報名\nhttps://event.cosmoseed.com.tw/courses\n\n— Din 🌱`,
+          quickReply: {
+            items: [
+              { type: 'action', action: { type: 'uri', label: '🧰 開啟工具箱', uri: 'https://cosmoseed.com.tw' } },
+              { type: 'action', action: { type: 'uri', label: '📅 看課程詳情', uri: 'https://event.cosmoseed.com.tw/courses' } },
+            ],
+          },
         });
       } else {
         await lineClient.replyMessage(event.replyToken, {
           type: 'text',
-          text: `歡迎加入 宇宙種子 CosmoSeed AI 🧬\n\n感謝你的加入！\n\n📅 下一場 AI 共學聚\n5/18（一）20:00–21:30 線上\n\n📌 主題：Claude Skills × Projects 入門實戰\n　　　打造你的 AI 內容工作流\n\n👉 報名連結：https://ai-signup-backend.onrender.com/\n\nMeet 連結與活動提醒會在這裡通知你 ✨\n\n期待 5/18 見！— Din 🌱`,
+          text: `歡迎加入 宇宙種子 CosmoSeed AI 🧬\n\n幫品牌行銷人準備了見面禮 🎁\n\n🧰【AI 工具箱】100% 繁中、免費使用\n我親自篩選 + 評分的行銷利器\n附「使用情境 × 建議流程」\n省下你找工具、試錯的時間\n\n👉 立即開啟\nhttps://cosmoseed.com.tw\n\n────\n\n📅 每月 2 次 AI 共學聚\n請點選最新課程報名\nhttps://event.cosmoseed.com.tw/courses\n\n— Din 🌱`,
+          quickReply: {
+            items: [
+              { type: 'action', action: { type: 'uri', label: '🧰 開啟工具箱', uri: 'https://cosmoseed.com.tw' } },
+              { type: 'action', action: { type: 'uri', label: '📅 看課程詳情', uri: 'https://event.cosmoseed.com.tw/courses' } },
+              { type: 'action', action: { type: 'message', label: '📌 我要綁定通知', text: '我要綁定' } },
+            ],
+          },
         });
       }
     }
