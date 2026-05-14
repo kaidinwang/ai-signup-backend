@@ -3,15 +3,15 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI 共學聚課程列表 — 宇宙種子 CosmoSeed 線上共學社群</title>
-    <meta name="description" content="宇宙種子 CosmoSeed 主辦的 AI 共學聚課程列表。每月兩次線上聚會，阿邦老師、Din Din Wang 王宣方 帶你把 AI 學好用好。涵蓋 Claude、Gemini、ChatGPT、Projects、Skills、自動化等實戰主題。">
+    <title>AI 共學聚課程列表 — 宇宙種子 CosmoSeed AI</title>
+    <meta name="description" content="宇宙種子 CosmoSeed AI 主辦的 AI 共學聚課程列表。每月兩次線上聚會，阿邦老師、Din Din Wang 王宣方 帶你把 AI 學好用好。涵蓋 Claude、Gemini、ChatGPT、Projects、Skills、自動化等實戰主題。">
     <link rel="icon" type="image/png" href="/favicon.png">
     <link rel="apple-touch-icon" href="/apple-touch-icon.png">
     <link rel="canonical" href="https://event.cosmoseed.com.tw/courses.html">
 
     <meta property="og:type" content="website">
     <meta property="og:url" content="https://event.cosmoseed.com.tw/courses.html">
-    <meta property="og:title" content="AI 共學聚課程列表 — 宇宙種子 CosmoSeed">
+    <meta property="og:title" content="AI 共學聚課程列表 — 宇宙種子 CosmoSeed AI">
     <meta property="og:description" content="宇宙種子 AI 共學聚過去與目前進行中的課程。每月兩次線上聚會，跟阿邦老師、Din Din Wang 一起共學 AI。">
     <meta property="og:image" content="https://event.cosmoseed.com.tw/banner.png">
     <meta property="og:locale" content="zh_TW">
@@ -20,24 +20,193 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;600;700&family=Inter:wght@400;600;700;800&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;600;700;800&family=Inter:wght@400;600;700;800;900&display=swap');
         * { box-sizing: border-box; }
         html, body { font-family: 'Noto Sans TC', 'Inter', sans-serif; }
         body {
             background:
-              radial-gradient(ellipse at 15% 0%, rgba(190,210,255,0.35) 0%, transparent 45%),
-              radial-gradient(ellipse at 85% 100%, rgba(220,200,255,0.3) 0%, transparent 45%),
-              #f5f4ef;
-            color: #1e293b;
+              radial-gradient(ellipse 60% 40% at 20% 15%, rgba(139, 92, 246, 0.35) 0%, transparent 60%),
+              radial-gradient(ellipse 70% 50% at 80% 85%, rgba(56, 189, 248, 0.25) 0%, transparent 60%),
+              radial-gradient(ellipse 50% 40% at 90% 30%, rgba(236, 72, 153, 0.22) 0%, transparent 55%),
+              radial-gradient(ellipse 60% 60% at 10% 75%, rgba(99, 102, 241, 0.28) 0%, transparent 60%),
+              linear-gradient(180deg, #060818 0%, #0e0a2c 35%, #15103a 65%, #060818 100%);
+            color: #e2e8f0;
             min-height: 100vh;
+            position: relative;
+            overflow-x: hidden;
         }
+        /* Stars layer */
+        body::before {
+            content: '';
+            position: fixed;
+            inset: 0;
+            background-image:
+              radial-gradient(1.5px 1.5px at 12% 8%, rgba(255,255,255,0.9), transparent),
+              radial-gradient(1px 1px at 23% 35%, rgba(255,255,255,0.7), transparent),
+              radial-gradient(1.2px 1.2px at 38% 18%, rgba(255,255,255,0.8), transparent),
+              radial-gradient(1px 1px at 52% 52%, rgba(255,255,255,0.5), transparent),
+              radial-gradient(1.8px 1.8px at 67% 12%, rgba(255,255,255,0.85), transparent),
+              radial-gradient(1px 1px at 78% 38%, rgba(255,255,255,0.6), transparent),
+              radial-gradient(1.3px 1.3px at 88% 68%, rgba(255,255,255,0.75), transparent),
+              radial-gradient(1px 1px at 5% 70%, rgba(255,255,255,0.5), transparent),
+              radial-gradient(1.5px 1.5px at 30% 82%, rgba(255,255,255,0.8), transparent),
+              radial-gradient(1px 1px at 45% 92%, rgba(255,255,255,0.6), transparent),
+              radial-gradient(1.2px 1.2px at 62% 78%, rgba(255,255,255,0.7), transparent),
+              radial-gradient(1px 1px at 75% 88%, rgba(255,255,255,0.5), transparent),
+              radial-gradient(1.6px 1.6px at 92% 18%, rgba(255,255,255,0.85), transparent),
+              radial-gradient(1px 1px at 18% 50%, rgba(255,255,255,0.55), transparent);
+            pointer-events: none;
+            z-index: 0;
+        }
+        body::after {
+            content: '';
+            position: fixed;
+            inset: 0;
+            background:
+              radial-gradient(ellipse 30% 20% at 30% 30%, rgba(167, 139, 250, 0.08) 0%, transparent 70%),
+              radial-gradient(ellipse 40% 25% at 70% 65%, rgba(96, 165, 250, 0.06) 0%, transparent 70%);
+            pointer-events: none;
+            z-index: 0;
+        }
+        .container-wrap { position: relative; z-index: 1; }
         .display-font { font-family: 'Inter', 'Noto Sans TC', sans-serif; letter-spacing: -0.02em; }
-        .course-card { background: #ffffff; border: 1px solid rgba(15,23,42,0.06); box-shadow: 0 10px 30px -10px rgba(15,23,42,0.08); transition: transform 0.2s, box-shadow 0.2s; }
-        .course-card:hover { transform: translateY(-2px); box-shadow: 0 20px 40px -10px rgba(15,23,42,0.12); }
-        .badge { display: inline-block; padding: 4px 12px; border-radius: 999px; font-size: 12px; font-weight: 600; }
-        .badge-live { background: linear-gradient(135deg, #fef3c7, #fde68a); color: #92400e; border: 1px solid rgba(217,119,6,0.3); }
-        .badge-done { background: #f1f5f9; color: #64748b; border: 1px solid rgba(100,116,139,0.2); }
-        .badge-upcoming { background: linear-gradient(135deg, #dbeafe, #bfdbfe); color: #1e40af; border: 1px solid rgba(37,99,235,0.3); }
+
+        /* Glass card */
+        .glass-card {
+            background: rgba(15, 17, 42, 0.55);
+            backdrop-filter: blur(14px);
+            -webkit-backdrop-filter: blur(14px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            box-shadow: 0 20px 60px -20px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+        }
+        .glass-card-light {
+            background: rgba(255, 255, 255, 0.03);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.07);
+        }
+
+        /* Course card */
+        .course-card {
+            display: block;
+            border-radius: 24px;
+            overflow: hidden;
+            transition: transform 0.3s ease, box-shadow 0.3s ease, border-color 0.3s ease;
+        }
+        .course-card.live:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 30px 80px -20px rgba(139, 92, 246, 0.4);
+            border-color: rgba(167, 139, 250, 0.4);
+        }
+        .course-banner {
+            position: relative;
+            width: 100%;
+            aspect-ratio: 16 / 9;
+            overflow: hidden;
+            background: #1e1b4b;
+        }
+        .course-banner img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            display: block;
+        }
+        .course-banner.past::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: rgba(8, 10, 24, 0.5);
+        }
+
+        /* Badges */
+        .badge { display: inline-flex; align-items: center; gap: 6px; padding: 4px 12px; border-radius: 999px; font-size: 12px; font-weight: 600; line-height: 1; }
+        .badge-live {
+            background: linear-gradient(135deg, rgba(245, 158, 11, 0.25), rgba(251, 146, 60, 0.2));
+            color: #fbbf24;
+            border: 1px solid rgba(251, 191, 36, 0.4);
+        }
+        .badge-done {
+            background: rgba(100, 116, 139, 0.15);
+            color: #94a3b8;
+            border: 1px solid rgba(148, 163, 184, 0.2);
+        }
+
+        /* Date stamp */
+        .date-stamp {
+            display: inline-flex;
+            align-items: baseline;
+            gap: 8px;
+            padding: 8px 16px;
+            border-radius: 14px;
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+        .date-stamp .big { font-family: 'Inter', sans-serif; font-size: 28px; font-weight: 800; letter-spacing: -0.02em; line-height: 1; color: #f8fafc; }
+        .date-stamp .meta { font-size: 12px; color: #94a3b8; line-height: 1.3; }
+
+        /* Lecturer pill */
+        .lecturer-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 4px 12px 4px 4px;
+            border-radius: 999px;
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            font-size: 13px;
+            color: #e2e8f0;
+            transition: background 0.15s, border-color 0.15s;
+        }
+        .lecturer-pill:hover { background: rgba(255, 255, 255, 0.06); border-color: rgba(255, 255, 255, 0.14); }
+        .lecturer-pill img { width: 28px; height: 28px; border-radius: 50%; object-fit: cover; flex-shrink: 0; }
+        .lecturer-pill .fallback { width: 28px; height: 28px; border-radius: 50%; background: linear-gradient(135deg, #8b5cf6, #ec4899); color: white; font-weight: 700; font-size: 12px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+
+        /* CTA button */
+        .cta-btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            padding: 16px 28px;
+            border-radius: 16px;
+            font-family: 'Inter', 'Noto Sans TC', sans-serif;
+            font-weight: 800;
+            font-size: 16px;
+            color: white;
+            background: linear-gradient(135deg, #f59e0b 0%, #ec4899 50%, #8b5cf6 100%);
+            box-shadow: 0 10px 30px -8px rgba(236, 72, 153, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        .cta-btn:hover { transform: translateY(-2px); box-shadow: 0 16px 40px -8px rgba(236, 72, 153, 0.7), inset 0 1px 0 rgba(255, 255, 255, 0.25); }
+        .cta-btn .arrow { transition: transform 0.2s; }
+        .cta-btn:hover .arrow { transform: translateX(4px); }
+
+        /* Stat tag */
+        .stat-tag {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 12px;
+            border-radius: 10px;
+            background: rgba(16, 185, 129, 0.1);
+            border: 1px solid rgba(16, 185, 129, 0.2);
+            font-size: 12px;
+            color: #6ee7b7;
+            font-weight: 500;
+        }
+
+        /* Section divider */
+        .section-divider {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 18px;
+            padding: 0 4px;
+        }
+        .section-divider .dot { width: 8px; height: 8px; border-radius: 50%; }
+        .section-divider .dot.live { background: #fbbf24; box-shadow: 0 0 12px rgba(251, 191, 36, 0.6); animation: pulse 2s ease-in-out infinite; }
+        .section-divider .dot.done { background: #64748b; }
+        .section-divider h2 { font-family: 'Inter', 'Noto Sans TC', sans-serif; font-size: 16px; font-weight: 700; color: #f8fafc; letter-spacing: 0.05em; }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
     </style>
 
     <!-- Organization schema -->
@@ -49,7 +218,7 @@
       "alternateName": ["CosmoSeed", "宇宙種子有限公司", "CosmoSeed Co., Ltd."],
       "url": "https://event.cosmoseed.com.tw/",
       "logo": "https://event.cosmoseed.com.tw/banner.png",
-      "description": "宇宙種子 CosmoSeed 主辦 AI 共學聚，每月兩次線上聚會分享 AI 工具實戰與工作流。"
+      "description": "宇宙種子 CosmoSeed AI 是一家以 AI 工具與工作流為核心、行銷為本業的小型團隊，主辦 AI 共學聚每月兩次線上聚會。"
     }
     </script>
     <!-- ItemList schema for past/current courses -->
@@ -98,108 +267,151 @@
 </head>
 <body class="p-4 py-12 flex items-start justify-center">
 
-<div class="max-w-3xl w-full space-y-8">
+<div class="container-wrap max-w-3xl w-full space-y-10">
 
     <!-- Header -->
     <header class="text-center pt-4 pb-2">
-        <a href="/" class="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white/70 border border-slate-200/80 text-xs font-semibold text-slate-700 mb-6 hover:bg-white transition-all">
-            <i class="fas fa-arrow-left text-[10px]"></i> 回到報名頁
-        </a>
-        <div class="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-gradient-to-r from-blue-600 to-purple-600 text-white text-xs font-semibold mb-5 shadow-sm shadow-blue-600/20">
-            <span class="w-1.5 h-1.5 rounded-full bg-white animate-pulse"></span>
-            宇宙種子 CosmoSeed · AI 共學聚
+        <div class="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-gradient-to-r from-purple-600/30 to-pink-600/30 border border-purple-400/30 backdrop-blur text-xs font-semibold text-purple-100 mb-6 shadow-sm">
+            <span class="w-1.5 h-1.5 rounded-full bg-purple-300 animate-pulse"></span>
+            宇宙種子 CosmoSeed AI
         </div>
-        <h1 class="display-font text-4xl md:text-5xl font-extrabold text-slate-900 leading-tight mb-5" style="text-wrap: balance;">
-            AI 共學聚<br class="md:hidden">課程列表
+        <h1 class="display-font text-4xl md:text-5xl font-extrabold leading-tight mb-6" style="text-wrap: balance;">
+            <span class="bg-gradient-to-r from-white via-purple-100 to-white bg-clip-text text-transparent">AI 共學聚</span><br class="md:hidden">
+            <span class="text-white">課程列表</span>
         </h1>
-        <p class="text-slate-600 text-[15px] md:text-base leading-[1.85] max-w-xl mx-auto" style="text-wrap: pretty;">
-            <span class="font-semibold text-slate-800">宇宙種子 CosmoSeed</span> 主辦的線上 AI 共學聚，由 <span class="font-semibold text-slate-800">阿邦老師</span> 與 <span class="font-semibold text-slate-800">Din Din Wang</span> 共同發起。每月兩次，分享我們最近怎麼用 AI、踩過哪些坑、又有哪些新工具。
+        <p class="text-slate-300 text-[15px] md:text-base leading-[1.85] max-w-xl mx-auto" style="text-wrap: pretty;">
+            <span class="font-semibold text-white">阿邦老師</span> 與 <span class="font-semibold text-white">Din Din Wang</span> 共同發起的 AI 共學聚，每月兩次線上聚會。我們分享最近怎麼用 AI、踩過哪些坑、又有什麼新工具值得試。手把手帶你從實作中慢慢學會，把 AI 自然融入日常工作與生活，讓改變成為看得見的美好。
         </p>
     </header>
 
     <!-- 進行中 -->
     <section>
-        <div class="flex items-center gap-3 mb-4 px-2">
-            <span class="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></span>
-            <h2 class="display-font text-lg font-bold text-slate-900">報名中</h2>
+        <div class="section-divider">
+            <span class="dot live"></span>
+            <h2>NOW — 報名中</h2>
         </div>
 
-        <a href="/" class="course-card block rounded-3xl p-7 md:p-8 space-y-4">
-            <div class="flex items-start justify-between gap-3 flex-wrap">
-                <div class="flex items-center gap-3">
-                    <div class="display-font text-3xl font-extrabold text-slate-900">5/18</div>
-                    <div class="text-sm text-slate-500">
-                        <div>2026 年（週一）</div>
-                        <div>20:00 – 21:30</div>
+        <a href="/" class="course-card glass-card live block">
+            <div class="course-banner">
+                <img src="/banner.png" alt="5/18 AI 共學聚 — Claude Skills × Projects 入門實戰" loading="lazy">
+            </div>
+            <div class="p-6 md:p-7 space-y-5">
+                <div class="flex items-start justify-between gap-3 flex-wrap">
+                    <div class="date-stamp">
+                        <span class="big">5/18</span>
+                        <span class="meta">2026<br>週一 · 20:00–21:30</span>
                     </div>
+                    <span class="badge badge-live"><i class="fas fa-bolt text-[10px]"></i> 報名中</span>
                 </div>
-                <span class="badge badge-live">⭐ 報名中</span>
-            </div>
-            <h3 class="display-font text-2xl font-bold text-slate-900 leading-snug">
-                Claude Skills × Projects 入門實戰<br>
-                <span class="text-base font-medium text-slate-600">打造你的 AI 內容工作流</span>
-            </h3>
-            <p class="text-slate-600 text-[14px] leading-relaxed">
-                用 Claude 打造專屬內容助手，讓 AI 幫你穩定產出高品質內容。涵蓋 Claude Projects 入門、AI 輪播貼文實戰、Claude Skills × AI 工作流。
-            </p>
-            <div class="flex items-center gap-4 pt-2 text-sm text-slate-500">
-                <span><i class="fas fa-user mr-1.5 text-amber-600"></i>講師 王宣方 Din Din Wang</span>
-                <span><i class="fas fa-globe mr-1.5 text-blue-600"></i>線上</span>
-            </div>
-            <div class="pt-2">
-                <span class="inline-flex items-center gap-1 text-blue-600 font-semibold text-sm hover:gap-2 transition-all">
-                    立即報名 <i class="fas fa-arrow-right text-xs"></i>
-                </span>
+                <div>
+                    <h3 class="display-font text-xl md:text-2xl font-bold text-white leading-snug mb-2">
+                        Claude Skills × Projects 入門實戰
+                    </h3>
+                    <p class="text-base font-medium text-purple-200/80 mb-3">打造你的 AI 內容工作流</p>
+                    <p class="text-slate-300 text-[14px] leading-relaxed">
+                        用 Claude 打造專屬內容助手，讓 AI 幫你穩定產出高品質內容。涵蓋 Claude Projects 入門、AI 輪播貼文實戰、Claude Skills × AI 工作流。
+                    </p>
+                </div>
+                <div class="flex items-center gap-2 flex-wrap">
+                    <span class="text-xs uppercase tracking-wider text-slate-500 font-semibold mr-1">講師</span>
+                    <span class="lecturer-pill">
+                        <img src="/dindin.jpg" alt="Din Din Wang"
+                             onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
+                        <span class="fallback" style="display:none;">DD</span>
+                        Din Din Wang
+                    </span>
+                </div>
+                <div class="pt-2">
+                    <span class="cta-btn w-full">
+                        立即報名 <span class="arrow">→</span>
+                    </span>
+                </div>
             </div>
         </a>
     </section>
 
     <!-- 過去課程 -->
     <section>
-        <div class="flex items-center gap-3 mb-4 px-2">
-            <span class="w-2 h-2 rounded-full bg-slate-400"></span>
-            <h2 class="display-font text-lg font-bold text-slate-900">過去課程</h2>
+        <div class="section-divider">
+            <span class="dot done"></span>
+            <h2>PAST — 過去課程</h2>
         </div>
 
-        <div class="course-card rounded-3xl p-7 md:p-8 space-y-4">
-            <div class="flex items-start justify-between gap-3 flex-wrap">
-                <div class="flex items-center gap-3">
-                    <div class="display-font text-3xl font-extrabold text-slate-500">5/4</div>
-                    <div class="text-sm text-slate-500">
-                        <div>2026 年（週一）</div>
-                        <div>20:00 – 21:00</div>
-                    </div>
-                </div>
-                <span class="badge badge-done">已結束</span>
+        <div class="course-card glass-card block">
+            <div class="course-banner past">
+                <img src="/banner-0504.png" alt="5/4 AI 共學聚 — 用 Gemini 讓工作快一倍" loading="lazy">
             </div>
-            <h3 class="display-font text-xl font-bold text-slate-800 leading-snug">
-                不懂 AI 也能學會！用 Gemini 讓工作快一倍、生活更輕鬆
-            </h3>
-            <p class="text-slate-600 text-[14px] leading-relaxed">
-                從 Gmail、Google 雲端硬碟到 Gem 自動化機器人，掌握 Gemini 在工作與生活上的實戰應用。
-            </p>
-            <div class="flex items-center gap-4 pt-2 text-sm text-slate-500 flex-wrap">
-                <span><i class="fas fa-user-friends mr-1.5 text-purple-600"></i>講師 阿邦老師、Din Din Wang</span>
-                <span><i class="fas fa-users mr-1.5 text-emerald-600"></i>189 報名 / 96 出席</span>
+            <div class="p-6 md:p-7 space-y-5">
+                <div class="flex items-start justify-between gap-3 flex-wrap">
+                    <div class="date-stamp">
+                        <span class="big" style="color:#94a3b8;">5/4</span>
+                        <span class="meta">2026<br>週一 · 20:00–21:00</span>
+                    </div>
+                    <span class="badge badge-done"><i class="fas fa-check text-[10px]"></i> 已結束</span>
+                </div>
+                <div>
+                    <h3 class="display-font text-xl font-bold text-slate-100 leading-snug mb-2">
+                        不懂 AI 也能學會！用 Gemini 讓工作快一倍
+                    </h3>
+                    <p class="text-slate-400 text-[14px] leading-relaxed">
+                        從 Gmail、Google 雲端硬碟到 Gem 自動化機器人，掌握 Gemini 在工作與生活上的實戰應用。
+                    </p>
+                </div>
+                <div class="flex items-center gap-2 flex-wrap">
+                    <span class="text-xs uppercase tracking-wider text-slate-500 font-semibold mr-1">講師</span>
+                    <span class="lecturer-pill">
+                        <img src="/abang.jpg" alt="阿邦老師"
+                             onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
+                        <span class="fallback" style="display:none;background:linear-gradient(135deg,#8b5cf6,#3b82f6);">阿</span>
+                        阿邦老師
+                    </span>
+                    <span class="lecturer-pill">
+                        <img src="/dindin.jpg" alt="Din Din Wang"
+                             onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
+                        <span class="fallback" style="display:none;">DD</span>
+                        Din Din Wang
+                    </span>
+                </div>
+                <div class="flex items-center gap-2 flex-wrap pt-1">
+                    <span class="stat-tag"><i class="fas fa-users text-[10px]"></i> 189 報名</span>
+                    <span class="stat-tag" style="background:rgba(56,189,248,0.1);border-color:rgba(56,189,248,0.2);color:#7dd3fc;"><i class="fas fa-video text-[10px]"></i> 101 出席</span>
+                </div>
             </div>
         </div>
     </section>
 
     <!-- About CosmoSeed -->
-    <section class="course-card rounded-3xl p-7 md:p-8">
-        <h2 class="display-font text-xl font-bold text-slate-900 mb-3">關於 宇宙種子 CosmoSeed</h2>
-        <p class="text-slate-600 text-[14px] leading-relaxed mb-3">
-            <span class="font-semibold text-slate-800">宇宙種子 CosmoSeed</span>（CosmoSeed Co., Ltd.）是一家以 AI 工具與工作流為核心的小型團隊，相信「讓 AI 真的能用」需要實作、迭代、與一群同行者。
-        </p>
-        <p class="text-slate-600 text-[14px] leading-relaxed">
-            AI 共學聚是我們發起的線上共學社群，每月兩次，跨工具、跨主題、跨領域，希望讓沒寫過程式的人也能用 AI 把事情做出來。
-        </p>
+    <section class="glass-card rounded-3xl p-7 md:p-9 space-y-6">
+        <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-2xl bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-white font-bold shadow-lg shadow-purple-500/30">
+                <i class="fas fa-seedling"></i>
+            </div>
+            <h2 class="display-font text-xl md:text-2xl font-bold text-white">關於 宇宙種子 CosmoSeed AI</h2>
+        </div>
+        <div class="space-y-4">
+            <p class="text-slate-300 text-[15px] leading-[1.85]">
+                <span class="font-semibold text-white">宇宙種子 CosmoSeed AI</span>（CosmoSeed Co., Ltd.）是一家以 <span class="font-semibold text-purple-200">AI 工具與工作流</span> 為核心的小型團隊。我們以 <span class="font-semibold text-pink-200">行銷</span> 為本業，相信「讓 AI 真的能用」需要實作、迭代、與一群同行者 — 用 AI 幫助更多企業與個人，因為學會 AI 而工作更高效、生活更從容。
+            </p>
+            <p class="text-slate-300 text-[15px] leading-[1.85]">
+                <span class="font-semibold text-white">AI 共學聚</span> 是我們發起的線上共學社群，每月兩次，跨工具、跨主題、跨領域，希望讓沒寫過程式的人也能用 AI 把事情做出來。
+            </p>
+        </div>
+        <div class="flex flex-wrap gap-2 pt-2">
+            <span class="px-3 py-1.5 rounded-lg bg-purple-500/10 border border-purple-400/20 text-purple-200 text-xs font-medium"># AI 工具</span>
+            <span class="px-3 py-1.5 rounded-lg bg-pink-500/10 border border-pink-400/20 text-pink-200 text-xs font-medium"># 行銷</span>
+            <span class="px-3 py-1.5 rounded-lg bg-blue-500/10 border border-blue-400/20 text-blue-200 text-xs font-medium"># 工作流</span>
+            <span class="px-3 py-1.5 rounded-lg bg-amber-500/10 border border-amber-400/20 text-amber-200 text-xs font-medium"># 共學社群</span>
+        </div>
     </section>
 
-    <!-- Footer -->
-    <div class="text-center pb-6 pt-2 space-y-1">
-        <p class="text-slate-400 text-xs">宇宙種子 AI 共學聚 · 每月兩次 · 共學共好</p>
-        <p class="text-slate-400/70 text-[11px]">© 2026 宇宙種子有限公司 CosmoSeed Co., Ltd. All rights reserved.</p>
+    <!-- Footer with toolbox link -->
+    <div class="text-center pb-6 pt-2 space-y-3">
+        <a href="https://cosmoseed.com.tw/" class="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-white/5 border border-white/10 hover:bg-white/10 hover:border-white/20 text-slate-200 text-sm font-medium transition-all backdrop-blur">
+            <i class="fas fa-toolbox text-amber-300"></i>
+            回主頁（CosmoSeed AI 工具箱）
+        </a>
+        <p class="text-slate-500 text-xs pt-2">宇宙種子 AI 共學聚 · 每月兩次 · 共學共好</p>
+        <p class="text-slate-600/70 text-[11px]">© 2026 宇宙種子有限公司 CosmoSeed Co., Ltd. All rights reserved.</p>
     </div>
 </div>
 
