@@ -115,6 +115,14 @@ async function initDB() {
   // Backfill：既有資料（無 event_date）一律歸為 5/4 場次（共學聚首場）
   const backfilled = await pool.query(`UPDATE registrations SET event_date='2026-05-04' WHERE event_date IS NULL RETURNING id`);
   if (backfilled.rowCount > 0) console.log(`[DB] Backfilled event_date='2026-05-04' for ${backfilled.rowCount} legacy row(s)`);
+  // Migration: 把 UNIQUE(email) 改成 UNIQUE(email, event_date)，讓同一 email 在不同場次有獨立 row（像訂單）
+  await pool.query(`ALTER TABLE registrations DROP CONSTRAINT IF EXISTS registrations_email_key`);
+  await pool.query(`
+    DO $$ BEGIN
+      ALTER TABLE registrations ADD CONSTRAINT registrations_email_event_unique UNIQUE (email, event_date);
+    EXCEPTION WHEN duplicate_object THEN NULL;
+    END $$;
+  `);
   // 一次性修復：把所有 email 統一轉小寫，避免 LINE 綁定對不上
   const fixed = await pool.query(`
     UPDATE registrations SET email = LOWER(TRIM(email))
@@ -231,13 +239,12 @@ app.post('/register', async (req, res) => {
       INSERT INTO registrations
         (name, email, attendance, interests, level, tools, tools_other, job_type, source, want_to_learn, subscribe_line, event_date)
       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
-      ON CONFLICT (email) DO UPDATE SET
+      ON CONFLICT (email, event_date) DO UPDATE SET
         name=EXCLUDED.name, attendance=EXCLUDED.attendance,
         interests=EXCLUDED.interests, level=EXCLUDED.level,
         tools=EXCLUDED.tools, tools_other=EXCLUDED.tools_other,
         job_type=EXCLUDED.job_type, source=EXCLUDED.source,
-        want_to_learn=EXCLUDED.want_to_learn, subscribe_line=EXCLUDED.subscribe_line,
-        event_date=EXCLUDED.event_date
+        want_to_learn=EXCLUDED.want_to_learn, subscribe_line=EXCLUDED.subscribe_line
     `, [name, email, attendance, interestStr, level||'', toolsStr, tools_other||'', job_type||'', source||'', want_to_learn||'', subscribe_line||'', CURRENT_EVENT_DATE]);
 
     // 嘗試連結已有的 LINE 綁定
@@ -599,7 +606,8 @@ app.get('/admin/api/binding-stats', adminAuth, async (req, res) => {
       COUNT(*) FILTER (WHERE attendance IN ('Yes','Maybe')) AS render_attending,
       COUNT(*) FILTER (WHERE attendance IN ('Yes','Maybe') AND line_user_id IS NOT NULL) AS render_attending_bound
     FROM registrations
-  `);
+    WHERE event_date=$1
+  `, [CURRENT_EVENT_DATE]);
   const externalRows = await pool.query(`
     SELECT COUNT(*) AS external_bound
     FROM line_bindings lb
