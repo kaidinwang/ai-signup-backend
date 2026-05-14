@@ -3,19 +3,27 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI 共學聚課程列表 — 宇宙種子 CosmoSeed AI</title>
-    <meta name="description" content="宇宙種子 CosmoSeed AI 主辦的 AI 共學聚課程列表。每月兩次線上聚會，阿邦老師、Din Din Wang 王宣方 帶你把 AI 學好用好。涵蓋 Claude、Gemini、ChatGPT、Projects、Skills、自動化等實戰主題。">
+    <title>AI 共學聚｜每月 2 次免費線上課 — 宇宙種子 CosmoSeed AI</title>
+    <meta name="description" content="宇宙種子 CosmoSeed AI 主辦的 AI 共學聚：每月兩次免費線上課，阿邦老師、Din Din Wang 王宣方帶你把 Claude、Gemini、ChatGPT、Claude Skills、Projects、AI 自動化工作流學好用好。0 程式基礎也能跟，含現場 Q&A、課後錄影、LINE 學員社群。下一場 2026/5/18 Claude Skills × Projects 入門實戰。">
+    <meta name="keywords" content="AI 共學聚, AI 課程, Claude 教學, Claude Skills, Claude Projects, Gemini 教學, ChatGPT 教學, AI 工作流, 行銷自動化, AEO, 品牌策略, 線上 AI 課, 免費 AI 課程, 宇宙種子, CosmoSeed, Din Din Wang, 阿邦老師">
+    <meta name="author" content="宇宙種子 CosmoSeed AI">
+    <meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1,max-video-preview:-1">
     <link rel="icon" type="image/png" href="/favicon.png">
     <link rel="apple-touch-icon" href="/apple-touch-icon.png">
-    <link rel="canonical" href="https://event.cosmoseed.com.tw/courses.html">
+    <link rel="canonical" href="https://event.cosmoseed.com.tw/courses">
 
     <meta property="og:type" content="website">
-    <meta property="og:url" content="https://event.cosmoseed.com.tw/courses.html">
-    <meta property="og:title" content="AI 共學聚課程列表 — 宇宙種子 CosmoSeed AI">
-    <meta property="og:description" content="宇宙種子 AI 共學聚過去與目前進行中的課程。每月兩次線上聚會，跟阿邦老師、Din Din Wang 一起共學 AI。">
+    <meta property="og:url" content="https://event.cosmoseed.com.tw/courses">
+    <meta property="og:title" content="AI 共學聚｜每月 2 次免費線上課 — 宇宙種子 CosmoSeed AI">
+    <meta property="og:description" content="每月兩次免費線上 AI 共學，Claude / Gemini / ChatGPT / Claude Skills / Projects / AI 工作流實戰。0 程式基礎也能跟。下一場 2026/5/18。">
     <meta property="og:image" content="https://event.cosmoseed.com.tw/banner.png">
     <meta property="og:locale" content="zh_TW">
     <meta property="og:site_name" content="宇宙種子 AI 共學聚">
+
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="AI 共學聚｜每月 2 次免費線上課 — 宇宙種子 CosmoSeed AI">
+    <meta name="twitter:description" content="每月兩次免費線上 AI 共學，Claude / Gemini / Claude Skills / AI 工作流實戰。0 程式基礎也能跟。">
+    <meta name="twitter:image" content="https://event.cosmoseed.com.tw/banner.png">
 
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
@@ -100,15 +108,15 @@
         .course-banner {
             position: relative;
             width: 100%;
-            aspect-ratio: 21 / 9;
-            max-height: 260px;
+            aspect-ratio: 16 / 9;
+            max-height: 230px;
             overflow: hidden;
-            background: #1e1b4b;
+            background: #0c0f24;
         }
         .course-banner img {
             width: 100%;
             height: 100%;
-            object-fit: cover;
+            object-fit: contain;
             display: block;
         }
         .course-banner.past::after {
@@ -258,16 +266,60 @@
         }
         @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.55; } }
 
-        /* Brand mark (CosmoSeed lightning logo) */
+        /* Brand mark (CosmoSeed lightning logo — solid 桃粉色，無漸層) */
         .brand-mark {
-            width: 44px; height: 44px;
-            border-radius: 12px;
-            background: linear-gradient(135deg, #ec4899 0%, #f472b6 50%, #c084fc 100%);
-            box-shadow: 0 10px 24px -6px rgba(236, 72, 153, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.3);
+            width: 48px; height: 48px;
+            border-radius: 14px;
+            background: #ec4899;
+            box-shadow: 0 10px 24px -6px rgba(236, 72, 153, 0.5);
             display: inline-flex; align-items: center; justify-content: center;
             flex-shrink: 0;
         }
-        .brand-mark i { color: #fff; font-size: 20px; }
+        .brand-mark i { color: #fff; font-size: 22px; }
+
+        /* FAQ */
+        .faq-item {
+            border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+        }
+        .faq-item:last-child { border-bottom: none; }
+        .faq-item summary {
+            list-style: none;
+            cursor: pointer;
+            padding: 16px 0;
+            display: flex; align-items: flex-start; gap: 12px;
+            font-weight: 700;
+            color: #f8fafc;
+            font-size: 15px;
+            line-height: 1.55;
+        }
+        .faq-item summary::-webkit-details-marker { display: none; }
+        .faq-item summary::before {
+            content: 'Q';
+            display: inline-flex; align-items: center; justify-content: center;
+            width: 24px; height: 24px;
+            border-radius: 8px;
+            background: rgba(236, 72, 153, 0.18);
+            color: #f9a8d4;
+            font-family: 'Inter', sans-serif;
+            font-size: 12px; font-weight: 800;
+            flex-shrink: 0;
+            margin-top: 1px;
+        }
+        .faq-item summary::after {
+            content: '+';
+            margin-left: auto;
+            color: #94a3b8;
+            font-size: 20px; font-weight: 400;
+            transition: transform 0.25s ease;
+            line-height: 1;
+        }
+        .faq-item[open] summary::after { transform: rotate(45deg); color: #ec4899; }
+        .faq-item .faq-answer {
+            padding: 0 0 18px 36px;
+            color: #cbd5e1;
+            font-size: 14px;
+            line-height: 1.85;
+        }
 
         /* Service list */
         .service-row {
@@ -291,33 +343,115 @@
     {
       "@context": "https://schema.org",
       "@type": "Organization",
+      "@id": "https://event.cosmoseed.com.tw/#organization",
       "name": "宇宙種子",
-      "alternateName": ["CosmoSeed", "宇宙種子有限公司", "CosmoSeed Co., Ltd."],
+      "legalName": "宇宙種子有限公司 CosmoSeed Co., Ltd.",
+      "alternateName": ["CosmoSeed", "CosmoSeed AI", "宇宙種子 CosmoSeed AI"],
       "url": "https://event.cosmoseed.com.tw/",
-      "logo": "https://event.cosmoseed.com.tw/banner.png",
-      "description": "宇宙種子 CosmoSeed AI 是一家以 AI 工具與工作流為核心、行銷為本業的小型團隊，主辦 AI 共學聚每月兩次線上聚會。"
+      "logo": "https://event.cosmoseed.com.tw/apple-touch-icon.png",
+      "image": "https://event.cosmoseed.com.tw/banner.png",
+      "sameAs": ["https://cosmoseed.com.tw/"],
+      "description": "宇宙種子 CosmoSeed AI 是一支協助企業優化「品牌策略行銷」的實戰團隊。以 14 年資深品牌策略顧問為核心，結合 AI 工具與自動化工作流，為企業打造可落地的高效行銷生產力。同時主辦免費 AI 共學聚，每月兩次線上聚會。",
+      "knowsAbout": ["AI 工具", "Claude", "Claude Skills", "Claude Projects", "Gemini", "ChatGPT", "AI 自動化工作流", "品牌策略", "行銷策略", "AEO", "Answer Engine Optimization", "內容行銷"],
+      "founder": [
+        { "@type": "Person", "name": "王宣方 Din Din Wang" },
+        { "@type": "Person", "name": "阿邦老師" }
+      ]
     }
     </script>
-    <!-- ItemList schema for past/current courses -->
+
+    <!-- WebSite schema -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "WebSite",
+      "@id": "https://event.cosmoseed.com.tw/#website",
+      "url": "https://event.cosmoseed.com.tw/",
+      "name": "宇宙種子 AI 共學聚",
+      "description": "宇宙種子 CosmoSeed AI 主辦的 AI 共學聚每月課程列表與報名頁。",
+      "publisher": { "@id": "https://event.cosmoseed.com.tw/#organization" },
+      "inLanguage": "zh-TW"
+    }
+    </script>
+
+    <!-- BreadcrumbList schema -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "BreadcrumbList",
+      "itemListElement": [
+        { "@type": "ListItem", "position": 1, "name": "首頁", "item": "https://event.cosmoseed.com.tw/" },
+        { "@type": "ListItem", "position": 2, "name": "AI 共學聚課程列表", "item": "https://event.cosmoseed.com.tw/courses" }
+      ]
+    }
+    </script>
+
+    <!-- Person schema: Din Din Wang -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "Person",
+      "@id": "https://event.cosmoseed.com.tw/#person-dindin",
+      "name": "王宣方 Din Din Wang",
+      "alternateName": ["Din Din Wang", "王宣方", "Din"],
+      "jobTitle": "品牌策略顧問 / AI 工作流講師",
+      "description": "14 年資深品牌策略顧問，宇宙種子 CosmoSeed AI 共同創辦人，專長品牌策略、AEO 策略、Claude / Claude Skills / Projects 與 AI 自動化工作流實戰。",
+      "image": "https://event.cosmoseed.com.tw/dindin.jpg",
+      "worksFor": { "@id": "https://event.cosmoseed.com.tw/#organization" },
+      "knowsAbout": ["品牌策略", "AEO", "Claude", "Claude Skills", "Claude Projects", "AI 工作流", "內容行銷"]
+    }
+    </script>
+
+    <!-- Person schema: 阿邦老師 -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "Person",
+      "@id": "https://event.cosmoseed.com.tw/#person-abang",
+      "name": "阿邦老師",
+      "jobTitle": "AI 工具講師",
+      "description": "宇宙種子 CosmoSeed AI 共學聚共同主持人，專長 Gemini、ChatGPT、Google 生態 AI 應用、生活與工作自動化。",
+      "image": "https://event.cosmoseed.com.tw/abang.jpg",
+      "worksFor": { "@id": "https://event.cosmoseed.com.tw/#organization" }
+    }
+    </script>
+
+    <!-- ItemList schema：課程列表（混合 Event 與 Course 概念） -->
     <script type="application/ld+json">
     {
       "@context": "https://schema.org",
       "@type": "ItemList",
+      "name": "AI 共學聚課程列表",
+      "itemListOrder": "https://schema.org/ItemListOrderDescending",
+      "numberOfItems": 2,
       "itemListElement": [
         {
           "@type": "ListItem",
           "position": 1,
           "item": {
             "@type": "Event",
+            "@id": "https://event.cosmoseed.com.tw/#event-0518",
             "name": "AI 共學聚 — Claude Skills × Projects 入門實戰",
+            "description": "用 Claude 打造專屬內容助手，讓 AI 幫你穩定產出高品質內容。涵蓋 Claude Projects 入門、AI 輪播貼文實戰、Claude Skills × AI 工作流。0 程式基礎也能跟。",
             "startDate": "2026-05-18T20:00:00+08:00",
             "endDate": "2026-05-18T21:30:00+08:00",
             "eventAttendanceMode": "https://schema.org/OnlineEventAttendanceMode",
             "eventStatus": "https://schema.org/EventScheduled",
+            "image": "https://event.cosmoseed.com.tw/banner.png",
+            "inLanguage": "zh-TW",
+            "isAccessibleForFree": true,
             "location": { "@type": "VirtualLocation", "url": "https://event.cosmoseed.com.tw/" },
-            "performer": { "@type": "Person", "name": "王宣方 Din Din Wang" },
-            "organizer": { "@type": "Organization", "name": "宇宙種子 CosmoSeed", "url": "https://event.cosmoseed.com.tw/" },
-            "offers": { "@type": "Offer", "price": "0", "priceCurrency": "TWD", "url": "https://event.cosmoseed.com.tw/" }
+            "performer": { "@id": "https://event.cosmoseed.com.tw/#person-dindin" },
+            "organizer": { "@id": "https://event.cosmoseed.com.tw/#organization" },
+            "offers": {
+              "@type": "Offer",
+              "price": "0",
+              "priceCurrency": "TWD",
+              "availability": "https://schema.org/InStock",
+              "validFrom": "2026-04-15T00:00:00+08:00",
+              "url": "https://event.cosmoseed.com.tw/"
+            },
+            "about": ["Claude", "Claude Skills", "Claude Projects", "AI 內容工作流", "AI 輪播貼文"]
           }
         },
         {
@@ -325,17 +459,149 @@
           "position": 2,
           "item": {
             "@type": "Event",
-            "name": "AI 共學聚 — 用 Gemini 讓工作快一倍",
+            "@id": "https://event.cosmoseed.com.tw/#event-0504",
+            "name": "AI 共學聚 — 不懂 AI 也能學會！用 Gemini 讓工作快一倍",
+            "description": "從 Gmail、Google 雲端硬碟到 Gem 自動化機器人，掌握 Gemini 在工作與生活上的實戰應用。",
             "startDate": "2026-05-04T20:00:00+08:00",
             "endDate": "2026-05-04T21:00:00+08:00",
             "eventAttendanceMode": "https://schema.org/OnlineEventAttendanceMode",
             "eventStatus": "https://schema.org/EventScheduled",
+            "image": "https://event.cosmoseed.com.tw/banner-0504.png",
+            "inLanguage": "zh-TW",
+            "isAccessibleForFree": true,
             "location": { "@type": "VirtualLocation", "url": "https://event.cosmoseed.com.tw/" },
             "performer": [
-              { "@type": "Person", "name": "阿邦老師" },
-              { "@type": "Person", "name": "王宣方 Din Din Wang" }
+              { "@id": "https://event.cosmoseed.com.tw/#person-abang" },
+              { "@id": "https://event.cosmoseed.com.tw/#person-dindin" }
             ],
-            "organizer": { "@type": "Organization", "name": "宇宙種子 CosmoSeed" }
+            "organizer": { "@id": "https://event.cosmoseed.com.tw/#organization" },
+            "about": ["Gemini", "Google Workspace", "Gmail", "Google Drive", "AI 自動化"]
+          }
+        }
+      ]
+    }
+    </script>
+
+    <!-- Course schema：AI 共學聚整體（系列課） -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "Course",
+      "@id": "https://event.cosmoseed.com.tw/#course-series",
+      "name": "AI 共學聚｜每月 2 次免費線上 AI 實戰課",
+      "description": "宇宙種子 CosmoSeed AI 主辦的 AI 共學聚，每月兩次線上聚會，涵蓋 Claude、Gemini、ChatGPT、Claude Skills、Projects、AI 自動化工作流、品牌行銷應用等實戰主題。0 程式基礎也能跟，含現場 Q&A、課後錄影、LINE 學員社群。",
+      "provider": { "@id": "https://event.cosmoseed.com.tw/#organization" },
+      "inLanguage": "zh-TW",
+      "educationalLevel": "Beginner to Intermediate",
+      "audience": { "@type": "Audience", "audienceType": "想用 AI 提升工作效率與內容產出的行銷人、創業者、職場工作者，無程式基礎也可參與" },
+      "teaches": ["Claude Projects", "Claude Skills", "AI 內容工作流", "Gemini 工作應用", "ChatGPT 應用", "AI 自動化"],
+      "offers": {
+        "@type": "Offer",
+        "price": "0",
+        "priceCurrency": "TWD",
+        "category": "免費",
+        "availability": "https://schema.org/InStock",
+        "url": "https://event.cosmoseed.com.tw/courses"
+      },
+      "hasCourseInstance": [
+        {
+          "@type": "CourseInstance",
+          "name": "Claude Skills × Projects 入門實戰",
+          "courseMode": "online",
+          "courseWorkload": "PT1H30M",
+          "startDate": "2026-05-18T20:00:00+08:00",
+          "endDate": "2026-05-18T21:30:00+08:00",
+          "instructor": { "@id": "https://event.cosmoseed.com.tw/#person-dindin" },
+          "location": { "@type": "VirtualLocation", "url": "https://event.cosmoseed.com.tw/" }
+        }
+      ]
+    }
+    </script>
+
+    <!-- FAQPage schema (AEO) -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "FAQPage",
+      "mainEntity": [
+        {
+          "@type": "Question",
+          "name": "AI 共學聚是什麼？",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "AI 共學聚是宇宙種子 CosmoSeed AI 主辦的線上共學社群，每月兩次免費聚會，由阿邦老師與 Din Din Wang 王宣方共同主持。內容涵蓋 Claude、Gemini、ChatGPT、Claude Skills、Projects、AI 自動化工作流與品牌行銷應用，目標是讓沒寫過程式的人也能用 AI 解決真實工作問題。"
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "AI 共學聚需要付費嗎？",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "AI 共學聚目前完全免費，只需透過官方報名頁登記即可。報名後會在 LINE 收到 Google Meet 連結與課前提醒。"
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "我沒有寫程式經驗，可以參加 AI 共學聚嗎？",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "可以。AI 共學聚的設計就是給 0 程式基礎的學員。我們主打『用 AI 工具解決真實問題』，所有實作都不需要寫程式，著重在提示詞設計、工作流串接、AI 工具操作。"
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "AI 共學聚上課方式是什麼？線上還是實體？",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "全部採線上直播（Google Meet），每月兩次，週一晚上 20:00 開始，約 90 分鐘。報名後 Meet 連結會透過 LINE OA 推送，課前 30 分鐘也會收到提醒。"
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "錯過直播會有錄影回放嗎？",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "會。每場 AI 共學聚都會錄影，課後會將回放連結與重點整理透過 LINE 發送給已報名學員。"
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "下一場 AI 共學聚是什麼時候？主題是什麼？",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "下一場是 2026/5/18（週一）20:00–21:30，主題為「Claude Skills × Projects 入門實戰：打造你的 AI 內容工作流」，由 Din Din Wang 王宣方主講。報名請至 https://event.cosmoseed.com.tw/。"
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "誰是 AI 共學聚的講師？",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "AI 共學聚由兩位講師共同主持：王宣方 Din Din Wang 為 14 年資深品牌策略顧問，專長 Claude / Claude Skills / Projects、AI 工作流、AEO 策略；阿邦老師專長 Gemini、ChatGPT 與 Google 生態 AI 應用。"
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "宇宙種子 CosmoSeed AI 是做什麼的？",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "宇宙種子 CosmoSeed AI（CosmoSeed Co., Ltd.）是協助企業優化「品牌策略行銷」的實戰團隊，核心服務有三：(1) 品牌策略顧問—14 年資歷的品牌診斷與 AEO 策略佈局；(2) AI 效能提升方案—帶企業實作 AI 工具，優化內容產製與營運流程；(3) AI 共學聚—免費線上共學平台，每月兩次。"
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "宇宙種子提供企業 AI 顧問或內訓嗎？",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "提供。宇宙種子有兩條企業合作線：『品牌策略顧問』從市場定位、AEO 策略到漏斗設計；『AI 效能提升方案』則帶團隊實作 AI 工具，優化內容產製與營運流程。歡迎透過 https://cosmoseed.com.tw 聯繫。"
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "什麼是 Claude Skills？跟 Claude Projects 有什麼差別？",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Claude Projects 讓你建立帶有專屬說明、檔案與記憶的 Claude 工作空間，適合長期專案；Claude Skills 則是可重複呼叫的能力封裝，把你的 SOP 變成 Claude 隨時可用的技能。AI 共學聚 5/18 場次會手把手教這兩者如何組合成個人 AI 內容工作流。"
           }
         }
       ]
@@ -521,6 +787,56 @@
             <span class="px-3 py-1.5 rounded-lg bg-purple-500/10 border border-purple-400/20 text-purple-200 text-xs font-medium"># AI 工作流</span>
             <span class="px-3 py-1.5 rounded-lg bg-amber-500/10 border border-amber-400/20 text-amber-200 text-xs font-medium"># 行銷自動化</span>
             <span class="px-3 py-1.5 rounded-lg bg-blue-500/10 border border-blue-400/20 text-blue-200 text-xs font-medium"># AEO 策略</span>
+        </div>
+    </section>
+
+    <!-- FAQ (AEO-friendly：問答結構同步 FAQPage schema) -->
+    <section class="glass-card rounded-3xl p-7 md:p-9">
+        <div class="flex items-center gap-3 mb-5">
+            <span class="brand-mark" style="background:#3b82f6;box-shadow:0 10px 24px -6px rgba(59,130,246,0.5);"><i class="fas fa-circle-question"></i></span>
+            <h2 class="display-font text-xl md:text-2xl font-bold text-white">常見問題 FAQ</h2>
+        </div>
+        <div>
+            <details class="faq-item" open>
+                <summary>AI 共學聚是什麼？</summary>
+                <div class="faq-answer">AI 共學聚是 <span class="font-semibold text-white">宇宙種子 CosmoSeed AI</span> 主辦的線上共學社群，每月兩次免費聚會，由 <span class="font-semibold text-white">阿邦老師</span> 與 <span class="font-semibold text-white">Din Din Wang 王宣方</span> 共同主持。內容涵蓋 Claude、Gemini、ChatGPT、Claude Skills、Projects、AI 自動化工作流與品牌行銷應用，目標是讓沒寫過程式的人也能用 AI 解決真實工作問題。</div>
+            </details>
+            <details class="faq-item">
+                <summary>AI 共學聚需要付費嗎？</summary>
+                <div class="faq-answer">目前完全免費，只需透過官方報名頁登記即可。報名後會在 LINE 收到 Google Meet 連結與課前提醒。</div>
+            </details>
+            <details class="faq-item">
+                <summary>我沒有寫程式經驗，可以參加嗎？</summary>
+                <div class="faq-answer">可以。AI 共學聚就是為 <span class="font-semibold text-white">0 程式基礎</span> 的學員設計。我們主打「用 AI 工具解決真實問題」，所有實作都不需要寫程式，著重在提示詞設計、工作流串接、AI 工具操作。</div>
+            </details>
+            <details class="faq-item">
+                <summary>上課方式是線上還是實體？</summary>
+                <div class="faq-answer">全部採線上直播（Google Meet），每月兩次，週一晚上 20:00 開始，約 90 分鐘。報名後 Meet 連結會透過 LINE OA 推送，課前 30 分鐘也會再次提醒。</div>
+            </details>
+            <details class="faq-item">
+                <summary>錯過直播會有錄影回放嗎？</summary>
+                <div class="faq-answer">會。每場 AI 共學聚都會錄影，課後會將回放連結與重點整理透過 LINE 發送給已報名學員。</div>
+            </details>
+            <details class="faq-item">
+                <summary>下一場是什麼時候？主題是什麼？</summary>
+                <div class="faq-answer">下一場是 <span class="font-semibold text-white">2026/5/18（週一）20:00–21:30</span>，主題：<span class="font-semibold text-pink-200">Claude Skills × Projects 入門實戰 — 打造你的 AI 內容工作流</span>，由 Din Din Wang 王宣方主講。報名請至 <a href="https://event.cosmoseed.com.tw/" class="text-purple-300 underline hover:text-purple-200">event.cosmoseed.com.tw</a>。</div>
+            </details>
+            <details class="faq-item">
+                <summary>誰是 AI 共學聚的講師？</summary>
+                <div class="faq-answer">兩位共同主持：<span class="font-semibold text-white">王宣方 Din Din Wang</span>—14 年資深品牌策略顧問，專長 Claude / Claude Skills / Projects、AI 工作流、AEO 策略；<span class="font-semibold text-white">阿邦老師</span>—專長 Gemini、ChatGPT 與 Google 生態 AI 應用。</div>
+            </details>
+            <details class="faq-item">
+                <summary>宇宙種子 CosmoSeed AI 是做什麼的？</summary>
+                <div class="faq-answer">協助企業優化「品牌策略行銷」的實戰團隊。三大核心服務：(1) <span class="font-semibold text-white">品牌策略顧問</span>—14 年資歷的品牌診斷與 AEO 策略佈局；(2) <span class="font-semibold text-white">AI 效能提升方案</span>—帶企業實作 AI 工具，優化內容產製與營運流程；(3) <span class="font-semibold text-white">AI 共學聚</span>—免費線上共學平台，每月兩次。</div>
+            </details>
+            <details class="faq-item">
+                <summary>宇宙種子提供企業 AI 顧問或內訓嗎？</summary>
+                <div class="faq-answer">提供。兩條企業合作線：<span class="font-semibold text-white">品牌策略顧問</span>—從市場定位、AEO 策略到漏斗設計；<span class="font-semibold text-white">AI 效能提升方案</span>—帶團隊實作 AI 工具，優化內容產製與營運流程。聯繫請至 <a href="https://cosmoseed.com.tw/" class="text-purple-300 underline hover:text-purple-200">cosmoseed.com.tw</a>。</div>
+            </details>
+            <details class="faq-item">
+                <summary>什麼是 Claude Skills？跟 Claude Projects 有什麼差別？</summary>
+                <div class="faq-answer"><span class="font-semibold text-white">Claude Projects</span> 讓你建立帶有專屬說明、檔案與記憶的 Claude 工作空間，適合長期專案；<span class="font-semibold text-white">Claude Skills</span> 則是可重複呼叫的能力封裝，把你的 SOP 變成 Claude 隨時可用的技能。AI 共學聚 5/18 場次會手把手教這兩者如何組合成個人 AI 內容工作流。</div>
+            </details>
         </div>
     </section>
 

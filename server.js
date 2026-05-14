@@ -62,6 +62,17 @@ app.use((req, res, next) => {
   next();
 });
 
+// 301 redirect /xxx.html → /xxx（canonical URL，避免 .html 與無副檔名雙重收錄）
+app.use((req, res, next) => {
+  if (req.method === 'GET' && req.path.endsWith('.html')) {
+    const clean = req.path.slice(0, -5) || '/';
+    const qIdx = req.originalUrl.indexOf('?');
+    const qs = qIdx >= 0 ? req.originalUrl.slice(qIdx) : '';
+    return res.redirect(301, clean + qs);
+  }
+  next();
+});
+
 app.use(express.static(path.join(__dirname, 'public'), { extensions: ['html'] }));
 
 // ─── Database (PostgreSQL) ───────────────────────────────────────────────────
