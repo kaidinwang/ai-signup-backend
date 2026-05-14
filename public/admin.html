@@ -64,6 +64,9 @@
     <!-- Filters -->
     <div class="glass rounded-2xl p-4 flex items-center gap-3 flex-wrap">
         <input id="searchInput" type="search" placeholder="🔍 搜尋姓名 / Email..." oninput="filterTable()" autocomplete="off" autocorrect="off" spellcheck="false" name="adm_search_no_fill" class="px-4 py-2 rounded-xl bg-slate-800 border border-white/10 text-white text-sm w-60">
+        <select id="eventFilter" onchange="filterTable()" class="px-3 py-2 rounded-xl bg-slate-800 border border-white/10 text-white text-sm">
+            <option value="">所有場次</option>
+        </select>
         <select id="attendFilter" onchange="filterTable()" class="px-3 py-2 rounded-xl bg-slate-800 border border-white/10 text-white text-sm">
             <option value="">所有出席狀態</option>
             <option value="Yes">✅ 確認參加</option>
@@ -106,6 +109,7 @@
                 <thead>
                     <tr>
                         <th>#</th>
+                        <th>場次</th>
                         <th>姓名</th>
                         <th>Email</th>
                         <th>出席</th>
@@ -143,6 +147,7 @@
 let adminPw = '';
 let allData = [];
 let filteredData = [];
+let currentEventDate = '';
 
 function login() {
     adminPw = document.getElementById('pwInput').value;
@@ -162,6 +167,7 @@ async function loadData() {
         document.getElementById('loginError').classList.add('hidden');
         document.getElementById('searchInput').value = '';
         allData = json.registrations;
+        currentEventDate = json.stats.currentEvent || '';
         renderStats(json.stats);
         filteredData = [...allData];
         renderTable();
@@ -210,6 +216,15 @@ function renderStats(stats) {
     const currentValue = sourceFilter.value;
     sourceFilter.innerHTML = '<option value="">所有報名來源</option>' +
         sourceEntries.map(([k]) => `<option value="${esc(k)}"${k === currentValue ? ' selected' : ''}>${esc(k)}</option>`).join('');
+
+    // Populate event filter dropdown（最新場次排前面，預設選當前場次）
+    const byEvent = stats.byEvent || {};
+    const currentEvent = stats.currentEvent;
+    const eventEntries = Object.entries(byEvent).sort((a, b) => b[0].localeCompare(a[0]));
+    const eventFilter = document.getElementById('eventFilter');
+    const previousEventValue = eventFilter.dataset.userSelected === '1' ? eventFilter.value : currentEvent;
+    eventFilter.innerHTML = '<option value="">所有場次</option>' +
+        eventEntries.map(([k, v]) => `<option value="${esc(k)}"${k === previousEventValue ? ' selected' : ''}>${esc(k === currentEvent ? '⭐ ' + k + '（當前）' : k)}（${v}）</option>`).join('');
 }
 
 const attendBadge = {
@@ -220,6 +235,7 @@ const attendBadge = {
 
 function renderTable() {
     const q = (document.getElementById('searchInput')?.value || '').toLowerCase();
+    const ef = document.getElementById('eventFilter')?.value || '';
     const af = document.getElementById('attendFilter')?.value || '';
     const lf = document.getElementById('lineFilter')?.value || '';
     const sf = document.getElementById('sourceFilter')?.value || '';
@@ -228,12 +244,13 @@ function renderTable() {
 
     filteredData = allData.filter(r => {
         const matchSearch = !q || r.name.toLowerCase().includes(q) || r.email.toLowerCase().includes(q);
+        const matchEvent  = !ef || (r.event_date || '(未標記)') === ef;
         const matchAttend = !af || r.attendance === af;
         const matchLine   = !lf || (lf === 'linked' ? !!r.line_user_id : !r.line_user_id);
         const matchSource = !sf || (r.source || '(未標記)') === sf;
         const matchNext   = !nf || (nf === 'yes' ? !!r.next_event_interested : !r.next_event_interested);
         const matchAt     = !at || (at === 'yes' ? !!r.attended : !r.attended);
-        return matchSearch && matchAttend && matchLine && matchSource && matchNext && matchAt;
+        return matchSearch && matchEvent && matchAttend && matchLine && matchSource && matchNext && matchAt;
     });
 
     document.getElementById('countLabel').textContent = `顯示 ${filteredData.length} / ${allData.length} 筆`;
@@ -241,6 +258,7 @@ function renderTable() {
     document.getElementById('tableBody').innerHTML = filteredData.map((r, i) => `
         <tr>
             <td class="text-slate-500">${i + 1}</td>
+            <td class="text-xs text-slate-400 whitespace-nowrap">${esc(r.event_date || '—')}</td>
             <td class="font-medium">${esc(r.name)}</td>
             <td class="text-slate-400 text-xs">${esc(r.email)}</td>
             <td>${attendBadge[r.attendance] || ''}</td>
@@ -258,7 +276,7 @@ function renderTable() {
             <td class="text-xs text-slate-500 whitespace-nowrap">${formatDate(r.created_at)}</td>
             <td><button onclick="deleteReg(${r.id}, '${esc(r.name)}')" class="text-red-500 hover:text-red-400 text-xs px-2 py-1 rounded hover:bg-red-500/10 transition-all">刪除</button></td>
         </tr>
-    `).join('') || '<tr><td colspan="13" class="text-center text-slate-600 py-10">沒有符合的報名者</td></tr>';
+    `).join('') || '<tr><td colspan="14" class="text-center text-slate-600 py-10">沒有符合的報名者</td></tr>';
 }
 
 function filterTable() { renderTable(); }
@@ -305,8 +323,9 @@ async function sendReminder(type) {
 }
 
 function exportCSV() {
-    const headers = ['姓名','Email','出席意願','實際出席','程度','職業','工具','興趣領域','報名來源','下一場意願','LINE綁定','已訂閱LINE@','報名時間'];
+    const headers = ['場次','姓名','Email','出席意願','實際出席','程度','職業','工具','興趣領域','報名來源','下一場意願','LINE綁定','已訂閱LINE@','報名時間'];
     const rows = filteredData.map(r => [
+        r.event_date || '',
         r.name, r.email, r.attendance,
         r.attended ? '是' : '否',
         r.level, r.job_type, r.tools, r.interests, r.source,
@@ -375,9 +394,12 @@ async function updateAttended(id, checked) {
 
 function computeStats(rows) {
     const bySource = {};
+    const byEvent = {};
     for (const r of rows) {
         const ch = r.source || '(未標記)';
         bySource[ch] = (bySource[ch] || 0) + 1;
+        const ev = r.event_date || '(未標記)';
+        byEvent[ev] = (byEvent[ev] || 0) + 1;
     }
     return {
         total:        rows.length,
@@ -388,10 +410,15 @@ function computeStats(rows) {
         nextEvent:    rows.filter(r => r.next_event_interested).length,
         attended:     rows.filter(r => r.attended).length,
         bySource,
+        byEvent,
+        currentEvent: currentEventDate,
     };
 }
 
 document.getElementById('pwInput')?.addEventListener('keydown', e => e.key === 'Enter' && login());
+
+// 標記使用者是否手動選過場次 filter（避免每次 loadData 都覆蓋成當前場次）
+document.getElementById('eventFilter')?.addEventListener('change', function() { this.dataset.userSelected = '1'; });
 </script>
 </body>
 </html>

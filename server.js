@@ -41,6 +41,9 @@ function httpsGet(url, token) {
   });
 }
 
+// 當前場次日期（ISO 格式 YYYY-MM-DD）。Render 設 CURRENT_EVENT_DATE env var 來切換場次。
+const CURRENT_EVENT_DATE = process.env.CURRENT_EVENT_DATE || '2026-05-18';
+
 const app = express();
 app.use(cors());
 // /webhook 用 raw body（LINE 簽章驗證需要），其餘用 JSON
@@ -86,6 +89,10 @@ async function initDB() {
   // Migration: 為既有表補上後台新增欄位
   await pool.query(`ALTER TABLE registrations ADD COLUMN IF NOT EXISTS next_event_interested BOOLEAN DEFAULT FALSE`);
   await pool.query(`ALTER TABLE registrations ADD COLUMN IF NOT EXISTS attended BOOLEAN DEFAULT FALSE`);
+  await pool.query(`ALTER TABLE registrations ADD COLUMN IF NOT EXISTS event_date TEXT`);
+  // Backfill：既有資料（無 event_date）一律歸為 5/4 場次（共學聚首場）
+  const backfilled = await pool.query(`UPDATE registrations SET event_date='2026-05-04' WHERE event_date IS NULL RETURNING id`);
+  if (backfilled.rowCount > 0) console.log(`[DB] Backfilled event_date='2026-05-04' for ${backfilled.rowCount} legacy row(s)`);
   // 一次性修復：把所有 email 統一轉小寫，避免 LINE 綁定對不上
   const fixed = await pool.query(`
     UPDATE registrations SET email = LOWER(TRIM(email))
@@ -145,7 +152,11 @@ async function sendLine(userId, message) {
 app.get('/check-email', async (req, res) => {
   const email = (req.query.email || '').trim().toLowerCase();
   if (!email) return res.json({ registered: false });
-  const result = await pool.query('SELECT name, attendance FROM registrations WHERE email=$1', [email]);
+  // 只檢查當前場次：之前場次報過不算重複
+  const result = await pool.query(
+    'SELECT name, attendance FROM registrations WHERE email=$1 AND event_date=$2',
+    [email, CURRENT_EVENT_DATE]
+  );
   if (result.rows[0]) {
     const r = result.rows[0];
     res.json({ registered: true, name: r.name, attendance: r.attendance });
@@ -167,8 +178,11 @@ app.post('/register', async (req, res) => {
     return res.status(400).json({ success: false, message: '姓名和 Email 為必填' });
   }
 
-  // 防呆：已報名直接回傳提示
-  const existing = await pool.query('SELECT name, attendance, line_user_id FROM registrations WHERE email=$1', [email]);
+  // 防呆：已報名直接回傳提示（只檢查當前場次，跨場次允許再報一次）
+  const existing = await pool.query(
+    'SELECT name, attendance, line_user_id FROM registrations WHERE email=$1 AND event_date=$2',
+    [email, CURRENT_EVENT_DATE]
+  );
   if (existing.rows[0]) {
     const reg = existing.rows[0];
     if (reg.line_user_id) {
@@ -193,15 +207,16 @@ app.post('/register', async (req, res) => {
   try {
     await pool.query(`
       INSERT INTO registrations
-        (name, email, attendance, interests, level, tools, tools_other, job_type, source, want_to_learn, subscribe_line)
-      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+        (name, email, attendance, interests, level, tools, tools_other, job_type, source, want_to_learn, subscribe_line, event_date)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
       ON CONFLICT (email) DO UPDATE SET
         name=EXCLUDED.name, attendance=EXCLUDED.attendance,
         interests=EXCLUDED.interests, level=EXCLUDED.level,
         tools=EXCLUDED.tools, tools_other=EXCLUDED.tools_other,
         job_type=EXCLUDED.job_type, source=EXCLUDED.source,
-        want_to_learn=EXCLUDED.want_to_learn, subscribe_line=EXCLUDED.subscribe_line
-    `, [name, email, attendance, interestStr, level||'', toolsStr, tools_other||'', job_type||'', source||'', want_to_learn||'', subscribe_line||'']);
+        want_to_learn=EXCLUDED.want_to_learn, subscribe_line=EXCLUDED.subscribe_line,
+        event_date=EXCLUDED.event_date
+    `, [name, email, attendance, interestStr, level||'', toolsStr, tools_other||'', job_type||'', source||'', want_to_learn||'', subscribe_line||'', CURRENT_EVENT_DATE]);
 
     // 嘗試連結已有的 LINE 綁定
     const binding = await pool.query('SELECT * FROM line_bindings WHERE email=$1', [email]);
@@ -395,9 +410,12 @@ app.get('/admin/api/registrations', adminAuth, async (req, res) => {
   const result = await pool.query('SELECT * FROM registrations ORDER BY created_at DESC');
   const rows = result.rows;
   const bySource = {};
+  const byEvent = {};
   for (const r of rows) {
     const ch = r.source || '(未標記)';
     bySource[ch] = (bySource[ch] || 0) + 1;
+    const ev = r.event_date || '(未標記)';
+    byEvent[ev] = (byEvent[ev] || 0) + 1;
   }
   res.json({
     stats: {
@@ -409,6 +427,8 @@ app.get('/admin/api/registrations', adminAuth, async (req, res) => {
       nextEvent:    rows.filter(r => r.next_event_interested).length,
       attended:     rows.filter(r => r.attended).length,
       bySource,
+      byEvent,
+      currentEvent: CURRENT_EVENT_DATE,
     },
     registrations: rows,
   });
@@ -488,7 +508,11 @@ app.get('/admin/api/binding-stats', adminAuth, async (req, res) => {
 });
 
 async function sendReminders(type = 'day') {
-  const result = await pool.query(`SELECT * FROM registrations WHERE attendance IN ('Yes','Maybe')`);
+  // 只通知當前場次的報名者，避免誤發給之前場次已報名但這次沒報的人
+  const result = await pool.query(
+    `SELECT * FROM registrations WHERE attendance IN ('Yes','Maybe') AND event_date=$1`,
+    [CURRENT_EVENT_DATE]
+  );
   // ⚠️ 下一場活動前(5/18 前)請主辦人更新此處的 Meet 連結與當晚 AI 工具準備事項
   const lineMsg = type === 'hour'
     ? `⏰ 還有 30 分鐘！\n\nAI 共學聚今晚 20:00 即將開始 🚀\n📌 Claude Skills × Projects 入門實戰\n\nMeet 連結與上課準備事項，請查看前一則 LINE 通知 📌\n\n🔔 19:50 開放進入教室\n20:00 準時開始（21:30 結束）\n\n等等見！🧬`
