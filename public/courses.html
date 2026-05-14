@@ -100,7 +100,8 @@
         .course-banner {
             position: relative;
             width: 100%;
-            aspect-ratio: 16 / 9;
+            aspect-ratio: 21 / 9;
+            max-height: 260px;
             overflow: hidden;
             background: #1e1b4b;
         }
@@ -120,9 +121,20 @@
         /* Badges */
         .badge { display: inline-flex; align-items: center; gap: 6px; padding: 4px 12px; border-radius: 999px; font-size: 12px; font-weight: 600; line-height: 1; }
         .badge-live {
-            background: linear-gradient(135deg, rgba(245, 158, 11, 0.25), rgba(251, 146, 60, 0.2));
-            color: #fbbf24;
-            border: 1px solid rgba(251, 191, 36, 0.4);
+            padding: 8px 18px;
+            font-size: 15px;
+            font-weight: 800;
+            letter-spacing: 0.04em;
+            background: linear-gradient(135deg, #f59e0b 0%, #ec4899 50%, #8b5cf6 100%);
+            color: #fff;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            box-shadow: 0 8px 24px -6px rgba(236, 72, 153, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.25);
+            animation: badge-pulse 2.4s ease-in-out infinite;
+        }
+        .badge-live i { font-size: 13px; color: #fff; }
+        @keyframes badge-pulse {
+            0%, 100% { box-shadow: 0 8px 24px -6px rgba(236, 72, 153, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.25); }
+            50% { box-shadow: 0 12px 32px -6px rgba(236, 72, 153, 0.85), inset 0 1px 0 rgba(255, 255, 255, 0.3); }
         }
         .badge-done {
             background: rgba(100, 116, 139, 0.15);
@@ -194,19 +206,84 @@
             font-weight: 500;
         }
 
-        /* Section divider */
-        .section-divider {
-            display: flex;
+        /* Section header */
+        .section-header {
+            display: inline-flex;
             align-items: center;
             gap: 12px;
+            padding: 10px 18px 10px 10px;
+            border-radius: 999px;
             margin-bottom: 18px;
-            padding: 0 4px;
+            background: rgba(15, 17, 42, 0.6);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            backdrop-filter: blur(10px);
         }
-        .section-divider .dot { width: 8px; height: 8px; border-radius: 50%; }
-        .section-divider .dot.live { background: #fbbf24; box-shadow: 0 0 12px rgba(251, 191, 36, 0.6); animation: pulse 2s ease-in-out infinite; }
-        .section-divider .dot.done { background: #64748b; }
-        .section-divider h2 { font-family: 'Inter', 'Noto Sans TC', sans-serif; font-size: 16px; font-weight: 700; color: #f8fafc; letter-spacing: 0.05em; }
-        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+        .section-header.live {
+            background: linear-gradient(135deg, rgba(245, 158, 11, 0.12), rgba(236, 72, 153, 0.12));
+            border-color: rgba(251, 191, 36, 0.35);
+            box-shadow: 0 10px 30px -10px rgba(236, 72, 153, 0.4);
+        }
+        .section-header .section-icon {
+            width: 34px; height: 34px; border-radius: 50%;
+            display: inline-flex; align-items: center; justify-content: center;
+            font-size: 14px; color: #fff;
+            flex-shrink: 0;
+        }
+        .section-header.live .section-icon {
+            background: linear-gradient(135deg, #f59e0b 0%, #ec4899 50%, #8b5cf6 100%);
+            box-shadow: 0 6px 18px -4px rgba(236, 72, 153, 0.6);
+            animation: pulse 2s ease-in-out infinite;
+        }
+        .section-header.done .section-icon {
+            background: rgba(100, 116, 139, 0.25);
+            color: #94a3b8;
+            border: 1px solid rgba(148, 163, 184, 0.25);
+        }
+        .section-header .section-label {
+            font-family: 'Inter', sans-serif;
+            font-size: 11px;
+            font-weight: 800;
+            letter-spacing: 0.18em;
+            color: #cbd5e1;
+            line-height: 1;
+            margin-bottom: 4px;
+        }
+        .section-header.live .section-label { color: #fbbf24; }
+        .section-header .section-title {
+            font-family: 'Inter', 'Noto Sans TC', sans-serif;
+            font-size: 17px;
+            font-weight: 800;
+            color: #f8fafc;
+            line-height: 1;
+        }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.55; } }
+
+        /* Brand mark (CosmoSeed lightning logo) */
+        .brand-mark {
+            width: 44px; height: 44px;
+            border-radius: 12px;
+            background: linear-gradient(135deg, #ec4899 0%, #f472b6 50%, #c084fc 100%);
+            box-shadow: 0 10px 24px -6px rgba(236, 72, 153, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.3);
+            display: inline-flex; align-items: center; justify-content: center;
+            flex-shrink: 0;
+        }
+        .brand-mark i { color: #fff; font-size: 20px; }
+
+        /* Service list */
+        .service-row {
+            display: flex; gap: 14px; align-items: flex-start;
+            padding: 14px 16px;
+            border-radius: 14px;
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 255, 255, 0.06);
+        }
+        .service-icon {
+            width: 36px; height: 36px;
+            border-radius: 10px;
+            display: inline-flex; align-items: center; justify-content: center;
+            font-size: 14px; color: #fff;
+            flex-shrink: 0;
+        }
     </style>
 
     <!-- Organization schema -->
@@ -286,9 +363,12 @@
 
     <!-- 進行中 -->
     <section>
-        <div class="section-divider">
-            <span class="dot live"></span>
-            <h2>NOW — 報名中</h2>
+        <div class="section-header live">
+            <span class="section-icon"><i class="fas fa-bolt"></i></span>
+            <div>
+                <div class="section-label">NOW</div>
+                <div class="section-title">報名中</div>
+            </div>
         </div>
 
         <a href="/" class="course-card glass-card live block">
@@ -301,7 +381,7 @@
                         <span class="big">5/18</span>
                         <span class="meta">2026<br>週一 · 20:00–21:30</span>
                     </div>
-                    <span class="badge badge-live"><i class="fas fa-bolt text-[10px]"></i> 報名中</span>
+                    <span class="badge badge-live"><i class="fas fa-bolt"></i> 報名中</span>
                 </div>
                 <div>
                     <h3 class="display-font text-xl md:text-2xl font-bold text-white leading-snug mb-2">
@@ -332,9 +412,12 @@
 
     <!-- 過去課程 -->
     <section>
-        <div class="section-divider">
-            <span class="dot done"></span>
-            <h2>PAST — 過去課程</h2>
+        <div class="section-header done">
+            <span class="section-icon"><i class="fas fa-clock-rotate-left"></i></span>
+            <div>
+                <div class="section-label">PAST</div>
+                <div class="section-title">過去課程</div>
+            </div>
         </div>
 
         <div class="course-card glass-card block">
@@ -383,24 +466,61 @@
     <!-- About CosmoSeed -->
     <section class="glass-card rounded-3xl p-7 md:p-9 space-y-6">
         <div class="flex items-center gap-3">
-            <div class="w-10 h-10 rounded-2xl bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-white font-bold shadow-lg shadow-purple-500/30">
-                <i class="fas fa-seedling"></i>
-            </div>
+            <span class="brand-mark"><i class="fas fa-bolt"></i></span>
             <h2 class="display-font text-xl md:text-2xl font-bold text-white">關於 宇宙種子 CosmoSeed AI</h2>
         </div>
-        <div class="space-y-4">
-            <p class="text-slate-300 text-[15px] leading-[1.85]">
-                <span class="font-semibold text-white">宇宙種子 CosmoSeed AI</span>（CosmoSeed Co., Ltd.）是一家以 <span class="font-semibold text-purple-200">AI 工具與工作流</span> 為核心的小型團隊。我們以 <span class="font-semibold text-pink-200">行銷</span> 為本業，相信「讓 AI 真的能用」需要實作、迭代、與一群同行者 — 用 AI 幫助更多企業與個人，因為學會 AI 而工作更高效、生活更從容。
-            </p>
-            <p class="text-slate-300 text-[15px] leading-[1.85]">
-                <span class="font-semibold text-white">AI 共學聚</span> 是我們發起的線上共學社群，每月兩次，跨工具、跨主題、跨領域，希望讓沒寫過程式的人也能用 AI 把事情做出來。
-            </p>
+        <p class="text-slate-300 text-[15px] leading-[1.85]">
+            <span class="font-semibold text-white">宇宙種子 CosmoSeed AI</span>（CosmoSeed Co., Ltd.）是一支協助企業優化「<span class="font-semibold text-pink-200">品牌策略行銷</span>」的實戰團隊。行銷的核心是策略與洞察，而 <span class="font-semibold text-purple-200">AI 是我們翻轉效率、實現自動化工作流的最強槓桿</span>。我們不只給建議，更教你如何透過 AI 工具轉化為真正能落地的生產力。
+        </p>
+
+        <div class="space-y-3">
+            <div class="flex items-center gap-2 pt-1">
+                <span class="text-xs uppercase tracking-[0.18em] font-extrabold text-amber-300/90">核心服務</span>
+                <span class="text-xs text-slate-400">— 行銷為本，AI 賦能</span>
+            </div>
+
+            <div class="service-row">
+                <span class="service-icon" style="background:linear-gradient(135deg,#8b5cf6,#ec4899);">
+                    <i class="fas fa-compass"></i>
+                </span>
+                <div class="space-y-1.5">
+                    <div class="font-bold text-white text-[15px]">品牌策略顧問</div>
+                    <p class="text-slate-300 text-[14px] leading-[1.75]">
+                        提供深度的品牌診斷與行銷佈局。從市場定位到 AEO 策略，用 <span class="font-semibold text-white">14 年資深品牌策略顧問</span> 的視角，為企業理出清晰的成長與漏斗路徑。
+                    </p>
+                </div>
+            </div>
+
+            <div class="service-row">
+                <span class="service-icon" style="background:linear-gradient(135deg,#f59e0b,#ec4899);">
+                    <i class="fas fa-gauge-high"></i>
+                </span>
+                <div class="space-y-1.5">
+                    <div class="font-bold text-white text-[15px]">AI 效能提升方案</div>
+                    <p class="text-slate-300 text-[14px] leading-[1.75]">
+                        我們不只給建議，更帶你實作。透過 AI 工具優化內容產製與營運流程，讓行銷不再受限於人力成本，實現真正的高效產出。
+                    </p>
+                </div>
+            </div>
+
+            <div class="service-row">
+                <span class="service-icon" style="background:linear-gradient(135deg,#3b82f6,#8b5cf6);">
+                    <i class="fas fa-users"></i>
+                </span>
+                <div class="space-y-1.5">
+                    <div class="font-bold text-white text-[15px]">AI 共學聚</div>
+                    <p class="text-slate-300 text-[14px] leading-[1.75]">
+                        這是我們發起的線上共學平台。每月兩次，我們希望帶領初學者跨越工具門檻，讓沒寫過程式的人也能用 AI 解決問題，從瑣碎的工作中解脫，<span class="font-semibold text-white">回歸生活的從容</span>。
+                    </p>
+                </div>
+            </div>
         </div>
-        <div class="flex flex-wrap gap-2 pt-2">
-            <span class="px-3 py-1.5 rounded-lg bg-purple-500/10 border border-purple-400/20 text-purple-200 text-xs font-medium"># AI 工具</span>
-            <span class="px-3 py-1.5 rounded-lg bg-pink-500/10 border border-pink-400/20 text-pink-200 text-xs font-medium"># 行銷</span>
-            <span class="px-3 py-1.5 rounded-lg bg-blue-500/10 border border-blue-400/20 text-blue-200 text-xs font-medium"># 工作流</span>
-            <span class="px-3 py-1.5 rounded-lg bg-amber-500/10 border border-amber-400/20 text-amber-200 text-xs font-medium"># 共學社群</span>
+
+        <div class="flex flex-wrap gap-2 pt-1">
+            <span class="px-3 py-1.5 rounded-lg bg-pink-500/10 border border-pink-400/20 text-pink-200 text-xs font-medium"># 品牌策略</span>
+            <span class="px-3 py-1.5 rounded-lg bg-purple-500/10 border border-purple-400/20 text-purple-200 text-xs font-medium"># AI 工作流</span>
+            <span class="px-3 py-1.5 rounded-lg bg-amber-500/10 border border-amber-400/20 text-amber-200 text-xs font-medium"># 行銷自動化</span>
+            <span class="px-3 py-1.5 rounded-lg bg-blue-500/10 border border-blue-400/20 text-blue-200 text-xs font-medium"># AEO 策略</span>
         </div>
     </section>
 
