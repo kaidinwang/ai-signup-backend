@@ -10,7 +10,7 @@
 
     <!-- Open Graph / Facebook / LINE -->
     <meta property="og:type" content="website">
-    <meta property="og:url" content="https://ai-signup-backend.onrender.com/">
+    <meta property="og:url" content="https://event.cosmoseed.com.tw/">
     <meta property="og:title" content="AI 共學聚 — 一起共學，與 AI 同進化">
     <meta property="og:description" content="5/18 線上聚會｜Claude Skills × Projects 入門實戰，打造你的 AI 內容工作流。阿邦老師 與 Din Din 帶你把 AI 學好、用好。">
     <meta property="og:image" content="https://ai-signup-backend.onrender.com/banner.png">
@@ -665,7 +665,8 @@
 </div>
 
 <script>
-const BACKEND = 'https://ai-signup-backend.onrender.com';
+// Empty = relative URL，page 從哪個網域 serve 就打到哪（支援 event.cosmoseed.com.tw + 原 onrender.com）
+const BACKEND = '';
 
 document.getElementById('registerForm').addEventListener('submit', async function(e) {
     e.preventDefault();
