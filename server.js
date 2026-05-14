@@ -131,6 +131,29 @@ async function initDB() {
   `);
   if (fixed.rowCount > 0) console.log(`[DB] Normalized ${fixed.rowCount} email(s) to lowercase`);
   await pool.query(`UPDATE line_bindings SET email = LOWER(TRIM(email)) WHERE email <> LOWER(TRIM(email))`);
+  // 一次性修復：Kai 5/4 有出席但 UNIQUE(email) 時代被 UPSERT 蓋成 5/18，重建 5/4 row
+  // Idempotent：5/4 row 一旦存在就不會再執行
+  const kaiEmail = 'aloha_skyskysky@hotmail.com';
+  const kai504 = await pool.query(`SELECT 1 FROM registrations WHERE email=$1 AND event_date='2026-05-04'`, [kaiEmail]);
+  const kai518 = await pool.query(`SELECT * FROM registrations WHERE email=$1 AND event_date='2026-05-18'`, [kaiEmail]);
+  if (kai504.rowCount === 0 && kai518.rows[0]) {
+    const r = kai518.rows[0];
+    await pool.query(`
+      INSERT INTO registrations
+        (name, email, attendance, interests, level, tools, tools_other,
+         job_type, source, want_to_learn, subscribe_line, line_user_id,
+         next_event_interested, attended, event_date, created_at)
+      VALUES ($1,$2,'Yes',$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,TRUE,'2026-05-04',$13)
+    `, [r.name, r.email, r.interests, r.level, r.tools, r.tools_other,
+        r.job_type, r.source, r.want_to_learn, r.subscribe_line, r.line_user_id,
+        r.next_event_interested, r.created_at]);
+    await pool.query(
+      `UPDATE registrations SET created_at='2026-05-14 18:00:00+08', attended=FALSE
+       WHERE email=$1 AND event_date='2026-05-18'`,
+      [kaiEmail]
+    );
+    console.log(`[DB] One-off: split ${kaiEmail} into 5/4 (attended) + 5/18 (re-registered 5/14)`);
+  }
   console.log('DB ready');
 }
 
