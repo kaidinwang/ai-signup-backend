@@ -1,0 +1,7 @@
+User-agent: *
+Allow: /
+Disallow: /admin.html
+Disallow: /admin/
+Disallow: /coming-soon.html
+
+Sitemap: https://event.cosmoseed.com.tw/sitemap.xml

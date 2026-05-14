@@ -102,6 +102,11 @@
         <option value="其他"></option>
     </datalist>
 
+    <datalist id="eventSuggestions">
+        <option value="2026-05-04"></option>
+        <option value="2026-05-18"></option>
+    </datalist>
+
     <!-- Table -->
     <div class="glass rounded-2xl overflow-hidden">
         <div class="overflow-x-auto">
@@ -258,7 +263,7 @@ function renderTable() {
     document.getElementById('tableBody').innerHTML = filteredData.map((r, i) => `
         <tr>
             <td class="text-slate-500">${i + 1}</td>
-            <td class="text-xs text-slate-400 whitespace-nowrap">${esc(r.event_date || '—')}</td>
+            <td><input type="text" list="eventSuggestions" value="${esc(r.event_date || '')}" onchange="updateEventDate(${r.id}, this.value)" placeholder="YYYY-MM-DD" class="bg-slate-800 border border-white/10 rounded px-2 py-1 text-xs text-slate-300 w-28"></td>
             <td class="font-medium">${esc(r.name)}</td>
             <td class="text-slate-400 text-xs">${esc(r.email)}</td>
             <td>${attendBadge[r.attendance] || ''}</td>
@@ -389,6 +394,16 @@ async function updateAttended(id, checked) {
         const target = allData.find(r => r.id === id);
         if (target) target.attended = checked;
         renderStats(computeStats(allData));
+    }
+}
+
+async function updateEventDate(id, value) {
+    const ok = await patchReg(id, { event_date: value.trim() || null });
+    if (ok) {
+        const target = allData.find(r => r.id === id);
+        if (target) target.event_date = value.trim() || null;
+        renderStats(computeStats(allData));
+        renderTable();
     }
 }
 

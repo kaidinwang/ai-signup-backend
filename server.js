@@ -450,6 +450,10 @@ app.patch('/admin/api/registrations/:id', adminAuth, async (req, res) => {
     fields.push(`attended=$${idx++}`);
     values.push(!!req.body.attended);
   }
+  if (req.body.event_date !== undefined) {
+    fields.push(`event_date=$${idx++}`);
+    values.push(req.body.event_date || null);
+  }
   if (fields.length === 0) return res.status(400).json({ error: 'No fields to update' });
   values.push(req.params.id);
   await pool.query(`UPDATE registrations SET ${fields.join(', ')} WHERE id=$${idx}`, values);
