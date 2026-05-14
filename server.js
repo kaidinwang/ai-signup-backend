@@ -51,6 +51,17 @@ app.use((req, res, next) => {
   if (req.path === '/webhook') return next();
   express.json()(req, res, next);
 });
+// 301 redirect 從 onrender.com 到自訂網域 event.cosmoseed.com.tw
+// ⚠️ /webhook 排除：LINE Messaging API 用 POST，301 會轉 GET 把 webhook 弄壞
+app.use((req, res, next) => {
+  if (req.path === '/webhook') return next();
+  const host = (req.headers.host || '').toLowerCase();
+  if (host === 'ai-signup-backend.onrender.com') {
+    return res.redirect(301, `https://event.cosmoseed.com.tw${req.originalUrl}`);
+  }
+  next();
+});
+
 app.use(express.static(path.join(__dirname, 'public')));
 
 // ─── Database (PostgreSQL) ───────────────────────────────────────────────────
