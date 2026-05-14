@@ -135,44 +135,6 @@ async function initDB() {
   `);
   if (fixed.rowCount > 0) console.log(`[DB] Normalized ${fixed.rowCount} email(s) to lowercase`);
   await pool.query(`UPDATE line_bindings SET email = LOWER(TRIM(email)) WHERE email <> LOWER(TRIM(email))`);
-  // 一次性修復：Kai 5/4 有出席但 UNIQUE(email) 時代被 UPSERT 蓋成 5/18，重建 5/4 row
-  // Idempotent：5/4 row 一旦存在就不會再執行
-  const kaiEmail = 'aloha_skyskysky@hotmail.com';
-  const kai504 = await pool.query(`SELECT 1 FROM registrations WHERE email=$1 AND event_date='2026-05-04'`, [kaiEmail]);
-  const kai518 = await pool.query(`SELECT * FROM registrations WHERE email=$1 AND event_date='2026-05-18'`, [kaiEmail]);
-  if (kai504.rowCount === 0 && kai518.rows[0]) {
-    const r = kai518.rows[0];
-    await pool.query(`
-      INSERT INTO registrations
-        (name, email, attendance, interests, level, tools, tools_other,
-         job_type, source, want_to_learn, subscribe_line, line_user_id,
-         next_event_interested, attended, event_date, created_at)
-      VALUES ($1,$2,'Yes',$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,TRUE,'2026-05-04',$13)
-    `, [r.name, r.email, r.interests, r.level, r.tools, r.tools_other,
-        r.job_type, r.source, r.want_to_learn, r.subscribe_line, r.line_user_id,
-        r.next_event_interested, r.created_at]);
-    await pool.query(
-      `UPDATE registrations SET created_at='2026-05-14 18:00:00+08', attended=FALSE
-       WHERE email=$1 AND event_date='2026-05-18'`,
-      [kaiEmail]
-    );
-    console.log(`[DB] One-off: split ${kaiEmail} into 5/4 (attended) + 5/18 (re-registered 5/14)`);
-  }
-  // 診斷：列出疑似「5/4 報過 → 5/18 重報、但歷史被 UPSERT 蓋掉」的人
-  // 條件：event_date=2026-05-18 且 created_at < 2026-05-14（5/18 頁面上架前就建的 row）
-  const suspects = await pool.query(`
-    SELECT id, name, email, created_at FROM registrations
-    WHERE event_date='2026-05-18' AND created_at < '2026-05-14'
-    ORDER BY created_at
-  `);
-  if (suspects.rowCount > 0) {
-    console.log(`[DB] 疑似跨場次重報（5/18 row 但建立日早於 5/14，共 ${suspects.rowCount} 人）：`);
-    for (const s of suspects.rows) {
-      console.log(`  - id=${s.id} ${s.name} <${s.email}> created=${s.created_at.toISOString()}`);
-    }
-  } else {
-    console.log('[DB] 無跨場次重報嫌疑帳號');
-  }
   console.log('DB ready');
 }
 
@@ -419,7 +381,7 @@ app.post('/webhook', express.raw({ type: '*/*' }), lineMiddleware, async (req, r
       if (reg.rows[0]) {
         await lineClient.replyMessage(event.replyToken, {
           type: 'text',
-          text: `歡迎回來，${reg.rows[0].name}！🧬\n\n🧰 AI 工具箱已上線（持續更新中）\nhttps://cosmoseed.com.tw\n\n📅 每月 2 次 AI 共學聚\n請點選最新課程報名\nhttps://event.cosmoseed.com.tw/courses\n\n— Din 🌱 (v3)`,
+          text: `歡迎回來，${reg.rows[0].name}！🧬\n\n🧰 AI 工具箱已上線（持續更新中）\nhttps://cosmoseed.com.tw\n\n📅 每月 2 次 AI 共學聚\n請點選最新課程報名\nhttps://event.cosmoseed.com.tw/courses\n\n— Din 🌱`,
           quickReply: {
             items: [
               { type: 'action', action: { type: 'uri', label: '🧰 開啟工具箱', uri: 'https://cosmoseed.com.tw' } },
@@ -430,7 +392,7 @@ app.post('/webhook', express.raw({ type: '*/*' }), lineMiddleware, async (req, r
       } else {
         await lineClient.replyMessage(event.replyToken, {
           type: 'text',
-          text: `歡迎加入 宇宙種子 CosmoSeed AI 🧬\n\n幫品牌行銷人準備了見面禮 🎁\n\n🧰【AI 工具箱】100% 繁中、免費使用\n我親自篩選 + 評分的行銷利器\n附「使用情境 × 建議流程」\n省下你找工具、試錯的時間\n\n👉 立即開啟\nhttps://cosmoseed.com.tw\n\n────\n\n📅 每月 2 次 AI 共學聚\n請點選最新課程報名\nhttps://event.cosmoseed.com.tw/courses\n\n— Din 🌱 (v3)`,
+          text: `歡迎加入 宇宙種子 CosmoSeed AI 🧬\n\n幫品牌行銷人準備了見面禮 🎁\n\n🧰【AI 工具箱】100% 繁中、免費使用\n我親自篩選 + 評分的行銷利器\n附「使用情境 × 建議流程」\n省下你找工具、試錯的時間\n\n👉 立即開啟\nhttps://cosmoseed.com.tw\n\n────\n\n📅 每月 2 次 AI 共學聚\n請點選最新課程報名\nhttps://event.cosmoseed.com.tw/courses\n\n— Din 🌱`,
           quickReply: {
             items: [
               { type: 'action', action: { type: 'uri', label: '🧰 開啟工具箱', uri: 'https://cosmoseed.com.tw' } },
