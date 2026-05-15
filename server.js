@@ -112,6 +112,7 @@ async function initDB() {
   await pool.query(`ALTER TABLE registrations ADD COLUMN IF NOT EXISTS next_event_interested BOOLEAN DEFAULT FALSE`);
   await pool.query(`ALTER TABLE registrations ADD COLUMN IF NOT EXISTS attended BOOLEAN DEFAULT FALSE`);
   await pool.query(`ALTER TABLE registrations ADD COLUMN IF NOT EXISTS event_date TEXT`);
+  await pool.query(`ALTER TABLE registrations ADD COLUMN IF NOT EXISTS bind_reminded_at TIMESTAMPTZ`);
   // Backfill：既有資料（無 event_date）一律歸為 5/4 場次（共學聚首場）
   const backfilled = await pool.query(`UPDATE registrations SET event_date='2026-05-04' WHERE event_date IS NULL RETURNING id`);
   if (backfilled.rowCount > 0) console.log(`[DB] Backfilled event_date='2026-05-04' for ${backfilled.rowCount} legacy row(s)`);
@@ -180,6 +181,20 @@ async function sendLine(userId, message) {
   }
 }
 
+// 一鍵 LINE 綁定連結（OAuth 動態連結，比 lin.ee 靜態好：登入 → 同意 → 加好友 → 自動寫入 line_bindings + registrations）
+function buildBindUrl(email) {
+  const base = process.env.BASE_URL || 'https://event.cosmoseed.com.tw';
+  return `${base}/line-login?email=${encodeURIComponent(email)}`;
+}
+
+function buildBindReminderEmail(name, email) {
+  const url = buildBindUrl(email);
+  return {
+    subject: '📲 最後一步：1 鍵綁定 LINE 接收 5/18 Meet 連結',
+    text: `嗨 ${name}！\n\n你已報名 5/18 AI 共學聚 ✅，但還沒完成 LINE 綁定。\n\nMeet 連結與活動前提醒會優先在 LINE 通知，建議完成綁定避免漏接：\n\n📲 點下面連結一鍵綁定（登入 LINE → 同意 → 加好友 → 完成，30 秒內搞定）：\n${url}\n\n如果你不想收 LINE 提醒，可以直接忽略這封信，活動前我們也會用 Email 通知。\n\n— AI 共學聚團隊 🧬`,
+  };
+}
+
 // ─── Routes ──────────────────────────────────────────────────────────────────
 
 // 即時檢查 email 是否已報名
@@ -229,7 +244,7 @@ app.post('/register', async (req, res) => {
       await sendEmail(
         email,
         '📋 你已報名 AI 共學聚！',
-        `嗨 ${reg.name}！\n\n你已報名 5/18 AI 共學聚 ✅\n\n📅 5/18（一）20:00–21:30 線上\n📌 主題：Claude Skills × Projects 入門實戰，打造你的 AI 內容工作流\n\n📲 還沒加入 LINE OA 嗎？\n👉 https://lin.ee/9WduU6Y\nMeet 連結與活動提醒會優先在 LINE 通知！\n\n— AI 共學聚團隊 🧬`
+        `嗨 ${reg.name}！\n\n你已報名 5/18 AI 共學聚 ✅\n\n📅 5/18（一）20:00–21:30 線上\n📌 主題：Claude Skills × Projects 入門實戰，打造你的 AI 內容工作流\n\n📲 還沒綁定 LINE 嗎？點下面連結一鍵綁定（30 秒）：\n${buildBindUrl(email)}\n\nMeet 連結與活動提醒會優先在 LINE 通知！\n\n— AI 共學聚團隊 🧬`
       );
     }
     return res.json({ success: false, duplicate: true, name: reg.name, attendance: reg.attendance });
@@ -265,7 +280,7 @@ app.post('/register', async (req, res) => {
       email,
       isGoing ? '✅ AI 共學聚 — 5/18 報名確認' : 'AI 共學聚 — 感謝填寫！',
       isGoing
-        ? `嗨 ${name}！\n\n感謝你報名 5/18 AI 共學聚 🌱\n\n📅 5/18（一）20:00–21:30 線上\n📌 主題：Claude Skills × Projects 入門實戰，打造你的 AI 內容工作流\n\n📲 加入 LINE OA：https://lin.ee/9WduU6Y\nMeet 連結會在活動前 24 小時 + 30 分鐘透過 LINE 通知你！\n\n— AI 共學聚團隊 🧬`
+        ? `嗨 ${name}！\n\n感謝你報名 5/18 AI 共學聚 🌱\n\n📅 5/18（一）20:00–21:30 線上\n📌 主題：Claude Skills × Projects 入門實戰，打造你的 AI 內容工作流\n\n📲 完成 LINE 綁定（最後一步！）：\n${buildBindUrl(email)}\n👆 點下去登入 LINE → 同意 → 加好友 → 自動完成，30 秒內搞定\n\nMeet 連結會在活動前 24 小時 + 30 分鐘透過 LINE 通知你！\n\n— AI 共學聚團隊 🧬`
         : `嗨 ${name}！\n\n感謝你填寫表單！下一場 5/18 開課，若之後想參加歡迎再回來填一次 📅\n\n— AI 共學聚團隊 🧬`
     );
 
@@ -596,6 +611,56 @@ async function sendReminders(type = 'day') {
 //    這兩個 cron 訊息只是時間提醒，會引導用戶看「前一則 LINE 通知」找連結
 cron.schedule('0 20 17 5 *',  () => sendReminders('day'),  { timezone: 'Asia/Taipei' });
 cron.schedule('30 19 18 5 *', () => sendReminders('hour'), { timezone: 'Asia/Taipei' });
+
+// ─── 綁定提醒 ────────────────────────────────────────────────────────────────
+// 寄一封一鍵綁定信給「報名了但 line_user_id 為空 + subscribe_line='yes' + 還沒寄過」的人。
+// 共用邏輯：admin 端點（一次性 catch-up）與 cron（T+24h 自動）都呼叫此函式。
+async function sendBindReminders({ eventDate = null, minAgeHours = 0, dryRun = false } = {}) {
+  const where = [
+    `line_user_id IS NULL`,
+    `subscribe_line = 'yes'`,
+    `bind_reminded_at IS NULL`,
+    `email IS NOT NULL AND email <> ''`,
+    `attendance IN ('Yes','Maybe')`,
+  ];
+  const params = [];
+  if (eventDate) { params.push(eventDate); where.push(`event_date = $${params.length}`); }
+  if (minAgeHours > 0) where.push(`created_at < NOW() - INTERVAL '${parseInt(minAgeHours)} hours'`);
+  const sql = `SELECT id, name, email FROM registrations WHERE ${where.join(' AND ')} ORDER BY created_at ASC`;
+  const result = await pool.query(sql, params);
+
+  const sent = [];
+  for (const reg of result.rows) {
+    const { subject, text } = buildBindReminderEmail(reg.name, reg.email);
+    if (!dryRun) {
+      await sendEmail(reg.email, subject, text);
+      await pool.query(`UPDATE registrations SET bind_reminded_at = NOW() WHERE id = $1`, [reg.id]);
+    }
+    sent.push({ id: reg.id, name: reg.name, email: reg.email });
+  }
+  console.log(`[BindReminder] ${dryRun ? '(dry-run) ' : ''}eventDate=${eventDate || 'any'} minAge=${minAgeHours}h sent=${sent.length}`);
+  return sent;
+}
+
+// 一次性 catch-up：admin 觸發
+// 用法：GET /admin/api/send-bind-reminders?pw=...&event=2026-05-18[&dry=1]
+app.get('/admin/api/send-bind-reminders', adminAuth, async (req, res) => {
+  try {
+    const eventDate = req.query.event || CURRENT_EVENT_DATE;
+    const dryRun = req.query.dry === '1';
+    const sent = await sendBindReminders({ eventDate, minAgeHours: 0, dryRun });
+    res.json({ success: true, dryRun, eventDate, count: sent.length, recipients: sent });
+  } catch (err) {
+    console.error('[Send Bind Reminders Error]', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// T+24h 自動：每日 12:00（台灣時間）跑一次，抓 24h 前報名但還沒綁的，寄第一次提醒
+cron.schedule('0 12 * * *', () => {
+  sendBindReminders({ eventDate: CURRENT_EVENT_DATE, minAgeHours: 24 })
+    .catch(err => console.error('[BindReminder Cron Error]', err.message));
+}, { timezone: 'Asia/Taipei' });
 
 // ─── Start ───────────────────────────────────────────────────────────────────
 const PORT = process.env.PORT || 3000;
