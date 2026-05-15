@@ -1,0 +1,80 @@
+/* Shared CosmoSeed Navbar — used by event pages (index/courses/coming-soon) */
+:root {
+  --cs-pink: #EC4899;
+  --cs-pink-h: #DB2777;
+  --cs-pink-dim: rgba(236,72,153,0.12);
+  --cs-text: #f1f5f9;
+  --cs-dim: #64748b;
+  --cs-border: rgba(255,255,255,0.08);
+}
+.cs-nav {
+  position: sticky; top: 0; z-index: 200;
+  background: rgba(13,13,13,0.92);
+  backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+  border-bottom: 1px solid var(--cs-border);
+  font-family: 'Noto Sans TC', sans-serif;
+}
+.cs-nav-inner {
+  max-width: 1200px; margin: 0 auto;
+  display: flex; align-items: center; gap: 14px;
+  height: 60px; padding: 0 24px;
+}
+.cs-logo {
+  font-size: 15px; font-weight: 900; white-space: nowrap; flex-shrink: 0;
+  letter-spacing: -0.02em; display: flex; align-items: center; gap: 7px;
+  color: var(--cs-text); text-decoration: none;
+}
+.cs-logo em { color: var(--cs-pink); font-style: normal; }
+.cs-logo-icon {
+  width: 28px; height: 28px; background: var(--cs-pink); border-radius: 7px;
+  display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+}
+.cs-nav-menu { display: flex; align-items: center; gap: 4px; flex-shrink: 0; }
+.cs-nav-menu a {
+  padding: 7px 12px; font-size: 14px; font-weight: 500;
+  color: var(--cs-text); border-radius: 8px; text-decoration: none;
+  transition: background .15s, color .15s; white-space: nowrap;
+}
+.cs-nav-menu a:hover { background: rgba(255,255,255,0.06); color: #fff; }
+.cs-nav-menu a.active { color: var(--cs-pink); background: var(--cs-pink-dim); }
+@media (max-width: 900px) { .cs-nav-menu { display: none; } }
+.cs-search-group {
+  flex: 1; display: flex; align-items: center; justify-content: center; gap: 8px; margin: 0;
+}
+.cs-search-wrap { position: relative; width: 100%; max-width: 300px; }
+.cs-search-wrap input {
+  width: 100%; background: rgba(255,255,255,0.04); border: 1px solid var(--cs-border);
+  border-radius: 8px; padding: 8px 14px 8px 38px;
+  color: var(--cs-text); font-size: 14px; outline: none;
+  transition: border-color .2s; font-family: inherit;
+}
+.cs-search-wrap input:focus { border-color: var(--cs-pink); }
+.cs-search-wrap input::placeholder { color: var(--cs-dim); }
+.cs-search-icon {
+  position: absolute; left: 12px; top: 50%; transform: translateY(-50%);
+  color: var(--cs-dim); font-size: 13px; pointer-events: none;
+}
+.cs-nav-cta {
+  background: var(--cs-pink); color: #fff; padding: 8px 16px;
+  border-radius: 8px; font-size: 13px; font-weight: 700;
+  white-space: nowrap; flex-shrink: 0; border: none; cursor: pointer;
+  transition: background .2s, transform .15s; font-family: inherit;
+}
+.cs-nav-cta:hover { background: var(--cs-pink-h); transform: translateY(-1px); }
+.cs-nav-link-courses {
+  display: inline-flex; align-items: center; gap: 6px;
+  background: linear-gradient(135deg, #a855f7 0%, #7c3aed 100%);
+  color: #fff; padding: 8px 14px;
+  border-radius: 8px; font-size: 13px; font-weight: 700;
+  white-space: nowrap; flex-shrink: 0; text-decoration: none;
+  transition: transform .15s, box-shadow .2s;
+  box-shadow: 0 4px 14px -4px rgba(168, 85, 247, 0.5);
+}
+.cs-nav-link-courses:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 8px 22px -4px rgba(168, 85, 247, 0.7);
+}
+@media (max-width: 640px) {
+  .cs-nav-link-courses .cs-nav-link-txt { display: none; }
+  .cs-nav-link-courses { padding: 8px 10px; }
+}

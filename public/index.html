@@ -275,8 +275,41 @@
         .success-overlay.show { display: flex; }
         .modal-card { background: #0c1322; color: #e2e8f0; border: 1px solid rgba(255,255,255,0.08); }
     </style>
+    <link rel="stylesheet" href="/cs-navbar.css">
 </head>
-<body class="p-4 py-12 flex items-start justify-center">
+<body class="min-h-screen">
+
+<!-- Shared CosmoSeed Navbar -->
+<nav class="cs-nav">
+  <div class="cs-nav-inner">
+    <a href="https://cosmoseed.com.tw" class="cs-logo" aria-label="CosmoSeed AI 工具箱首頁">
+      <span class="cs-logo-icon">
+        <svg width="14" height="18" viewBox="0 0 60 80" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <polygon points="38,2 10,42 30,42 22,78 52,36 32,36" fill="white"/>
+        </svg>
+      </span>
+      CosmoSeed <em>AI 工具箱</em>
+    </a>
+    <div class="cs-nav-menu" role="navigation" aria-label="主選單">
+      <a href="https://cosmoseed.com.tw">工具箱</a>
+      <a href="https://cosmoseed.com.tw/blog">部落格</a>
+      <a href="https://event.cosmoseed.com.tw" class="active">共學聚</a>
+    </div>
+    <form class="cs-search-group" id="csNavSearchForm" role="search" action="https://cosmoseed.com.tw/blog" method="get">
+      <div class="cs-search-wrap">
+        <span class="cs-search-icon">🔍</span>
+        <input type="text" id="csNavSearchInput" name="q" placeholder="搜尋文章..." aria-label="搜尋文章" autocomplete="off" />
+      </div>
+      <button type="submit" class="cs-nav-cta">確認 ✓</button>
+      <a href="/courses" class="cs-nav-link-courses" aria-label="AI 共學聚課程資訊">
+        <span>📅</span>
+        <span class="cs-nav-link-txt">課程資訊</span>
+      </a>
+    </form>
+  </div>
+</nav>
+
+<div class="p-4 py-12 flex items-start justify-center">
 
 <!-- Success Modal -->
 <div class="success-overlay" id="successOverlay">
@@ -933,5 +966,7 @@ if (bound === 'success') {
     alert('LINE 綁定失敗\n\n原因：' + (reason || '未知'));
 }
 </script>
+
+</div>
 </body>
 </html>
