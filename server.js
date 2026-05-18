@@ -287,18 +287,17 @@ app.post('/register', async (req, res) => {
 
     // 寄信與 LINE 通知背景執行，不阻塞回應
     const isGoing = attendance === 'Yes' || attendance === 'Maybe';
-    const liveMeetBlock = isEventLive() ? `\n💻 立即進入教室：\n${MEET_URL}\n\n🔔 19:50 開放、20:00 準時開始\n` : '';
     sendEmail(
       email,
       isGoing ? '✅ AI 共學聚 — 5/18 報名確認' : 'AI 共學聚 — 感謝填寫！',
       isGoing
-        ? `嗨 ${name}！\n\n感謝你報名 5/18 AI 共學聚 🌱\n\n📅 5/18（一）20:00–21:30 線上\n📌 主題：Claude AI 入門實戰｜小白也能快速做出精美社群內容\n${liveMeetBlock}\n📲 完成 LINE 綁定（最後一步！）：\n${buildBindUrl(email)}\n👆 點下去登入 LINE → 同意 → 加好友 → 自動完成，30 秒內搞定\n\nMeet 連結會在活動前 24 小時 + 30 分鐘透過 LINE 通知你！\n\n— AI 共學聚團隊 🧬`
+        ? `嗨 ${name}！\n\n感謝你報名 5/18 AI 共學聚 🌱\n\n📅 5/18（一）20:00–21:30 線上\n📌 主題：Claude AI 入門實戰｜小白也能快速做出精美社群內容\n\n💻 Meet 連結：\n${MEET_URL}\n🔔 19:50 開放進入教室、20:00 準時開始\n\n📲 完成 LINE 綁定（活動前 30 分鐘還會在 LINE 提醒你）：\n${buildBindUrl(email)}\n👆 點下去登入 LINE → 同意 → 加好友 → 自動完成，30 秒內搞定\n\n📋 上課前請準備：\n1. 筆電（手機體驗會差很多）\n2. Claude 帳號（沒有可先註冊 claude.ai）\n\n— AI 共學聚團隊 🧬`
         : `嗨 ${name}！\n\n感謝你填寫表單！下一場 5/18 開課，若之後想參加歡迎再回來填一次 📅\n\n— AI 共學聚團隊 🧬`
     );
 
     if (binding.rows[0]?.line_user_id) {
       sendLine(binding.rows[0].line_user_id,
-        `嗨 ${name}！\n\n你已報名 5/18 AI 共學聚 ✅\n\n📅 5/18（一）20:00–21:30 線上見\n📌 主題：Claude AI 入門實戰｜小白也能快速做出精美社群內容${isEventLive() ? `\n\n💻 立即進入教室：\n${MEET_URL}` : ''}\n\n活動前會在這裡提醒你 🧬`);
+        `嗨 ${name}！\n\n你已報名 5/18 AI 共學聚 ✅\n\n📅 5/18（一）20:00–21:30 線上見\n📌 主題：Claude AI 入門實戰｜小白也能快速做出精美社群內容\n\n💻 Meet 連結：\n${MEET_URL}\n🔔 19:50 開放、20:00 準時開始\n\n活動前 30 分鐘會在這裡再提醒你一次 🧬`);
     }
   } catch (err) {
     console.error('[Register Error]', err.message);
