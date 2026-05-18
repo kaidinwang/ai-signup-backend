@@ -660,6 +660,13 @@ app.post('/admin/api/send-slides', adminAuth, async (req, res) => {
       if (!dryRun) await sendEmail(reg.email, subject, text);
       sent.push({ id: reg.id, name: reg.name, email: reg.email });
     }
+    // 寄一份摘要副件給 admin（EMAIL_USER）
+    const adminEmail = process.env.EMAIL_USER;
+    if (!dryRun && adminEmail) {
+      const summary = `本場簡報已寄出 ${sent.length} 封 ✅\n\n📊 簡報連結：\n${slidesUrl}\n\n📝 收件名單（attended=TRUE）：\n${sent.map((s, i) => `${i + 1}. ${s.name} <${s.email}>`).join('\n')}\n\n— AI 共學聚自動寄送 🧬`;
+      await sendEmail(adminEmail, `📊 [副件] AI 共學聚 ${eventDate} 簡報已寄出 (${sent.length} 人)`, summary);
+    }
+
     console.log(`[Slides] ${dryRun ? '(dry-run) ' : ''}event=${eventDate} sent=${sent.length}`);
     res.json({ success: true, dryRun, eventDate, slidesUrl, count: sent.length, recipients: sent });
   } catch (err) {
