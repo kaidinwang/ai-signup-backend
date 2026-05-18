@@ -739,14 +739,14 @@ cron.schedule('30 19 18 5 *', () => sendReminders('hour'), { timezone: 'Asia/Tai
 // ─── 綁定提醒 ────────────────────────────────────────────────────────────────
 // 寄一封一鍵綁定信給「報名了但 line_user_id 為空 + subscribe_line='yes' + 還沒寄過」的人。
 // 共用邏輯：admin 端點（一次性 catch-up）與 cron（T+24h 自動）都呼叫此函式。
-async function sendBindReminders({ eventDate = null, minAgeHours = 0, dryRun = false } = {}) {
+async function sendBindReminders({ eventDate = null, minAgeHours = 0, dryRun = false, force = false } = {}) {
   const where = [
     `line_user_id IS NULL`,
     `subscribe_line = 'yes'`,
-    `bind_reminded_at IS NULL`,
     `email IS NOT NULL AND email <> ''`,
     `attendance IN ('Yes','Maybe')`,
   ];
+  if (!force) where.push(`bind_reminded_at IS NULL`);
   const params = [];
   if (eventDate) { params.push(eventDate); where.push(`event_date = $${params.length}`); }
   if (minAgeHours > 0) where.push(`created_at < NOW() - INTERVAL '${parseInt(minAgeHours)} hours'`);
@@ -772,8 +772,9 @@ app.get('/admin/api/send-bind-reminders', adminAuth, async (req, res) => {
   try {
     const eventDate = req.query.event || CURRENT_EVENT_DATE;
     const dryRun = req.query.dry === '1';
-    const sent = await sendBindReminders({ eventDate, minAgeHours: 0, dryRun });
-    res.json({ success: true, dryRun, eventDate, count: sent.length, recipients: sent });
+    const force = req.query.force === '1';
+    const sent = await sendBindReminders({ eventDate, minAgeHours: 0, dryRun, force });
+    res.json({ success: true, dryRun, eventDate, force, count: sent.length, recipients: sent });
   } catch (err) {
     console.error('[Send Bind Reminders Error]', err.message);
     res.status(500).json({ error: err.message });
