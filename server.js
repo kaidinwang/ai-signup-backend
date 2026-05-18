@@ -423,7 +423,7 @@ app.post('/webhook', express.raw({ type: '*/*' }), lineMiddleware, async (req, r
             items: [
               { type: 'action', action: { type: 'uri', label: '🧰 開啟工具箱', uri: 'https://cosmoseed.com.tw' } },
               { type: 'action', action: { type: 'uri', label: '📅 看課程詳情', uri: 'https://event.cosmoseed.com.tw/courses' } },
-              { type: 'action', action: { type: 'message', label: '📌 我要綁定通知', text: '我要綁定' } },
+              { type: 'action', action: { type: 'message', label: '📌 綁定課程通知', text: '我要綁定' } },
             ],
           },
         });
