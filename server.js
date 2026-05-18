@@ -781,6 +781,45 @@ app.get('/admin/api/send-bind-reminders', adminAuth, async (req, res) => {
   }
 });
 
+// 寄邀請信給「加了 LINE OA 但本場未報名」的舊粉絲
+async function sendInviteToUnregistered({ eventDate = null, dryRun = false } = {}) {
+  if (!eventDate) throw new Error('eventDate required');
+  const result = await pool.query(`
+    SELECT lb.line_user_id, lb.email, lb.display_name
+    FROM line_bindings lb
+    WHERE lb.email IS NOT NULL AND lb.email <> ''
+      AND NOT EXISTS (
+        SELECT 1 FROM registrations r
+        WHERE LOWER(TRIM(r.email)) = LOWER(TRIM(lb.email)) AND r.event_date = $1
+      )
+    ORDER BY lb.created_at ASC
+  `, [eventDate]);
+
+  const sent = [];
+  const subject = '🌱 今晚 20:00 AI 共學聚第二期 — 還沒報名嗎？';
+  for (const reg of result.rows) {
+    const greeting = reg.display_name ? `嗨 ${reg.display_name}！` : '嗨！';
+    const text = `${greeting}\n\n我是 Din 🌱\n\n還記得上一堂課我們用 Gemini 作行事曆，是不是簡單又有趣？\n這次第二期我們換主角上課啦！\n\n從零開始、手把手帶你用 Claude AI 一步步做出精美社群內容\n不藏私的實戰教學，幫你把 AI 真的帶進日常工作裡 🌱\n\n📌 主題：Claude AI 入門實戰｜小白也能快速做出精美社群內容\n📅 課程：5/18（一）20:00–21:30 線上\n\n🎫 報名連結（今晚 19:00 截止）：\n👉 https://event.cosmoseed.com.tw\n\n報名成功後 Meet 連結會立刻寄到你的信箱 📧\n\n📋 上課前請準備：\n1. 筆電（手機體驗會差很多）\n2. Claude 帳號（沒有可先註冊 claude.ai）\n\n19:50 開放進入教室、20:00 準時開始 🚀\n\n— Din 🧬`;
+    if (!dryRun) await sendEmail(reg.email, subject, text);
+    sent.push({ line_user_id: reg.line_user_id, email: reg.email, display_name: reg.display_name });
+  }
+  console.log(`[InviteUnregistered] ${dryRun ? '(dry-run) ' : ''}event=${eventDate} sent=${sent.length}`);
+  return sent;
+}
+
+// 用法：GET /admin/api/send-invite-unregistered?pw=...&event=2026-05-18[&dry=1]
+app.get('/admin/api/send-invite-unregistered', adminAuth, async (req, res) => {
+  try {
+    const eventDate = req.query.event || CURRENT_EVENT_DATE;
+    const dryRun = req.query.dry === '1';
+    const sent = await sendInviteToUnregistered({ eventDate, dryRun });
+    res.json({ success: true, dryRun, eventDate, count: sent.length, recipients: sent });
+  } catch (err) {
+    console.error('[Invite Unregistered Error]', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // T+24h 自動：每日 12:00（台灣時間）跑一次，抓 24h 前報名但還沒綁的，寄第一次提醒
 cron.schedule('0 12 * * *', () => {
   sendBindReminders({ eventDate: CURRENT_EVENT_DATE, minAgeHours: 24 })
