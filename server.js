@@ -43,6 +43,16 @@ function httpsGet(url, token) {
 
 // 當前場次日期（ISO 格式 YYYY-MM-DD）。Render 設 CURRENT_EVENT_DATE env var 來切換場次。
 const CURRENT_EVENT_DATE = process.env.CURRENT_EVENT_DATE || '2026-05-18';
+const MEET_URL = process.env.MEET_URL || 'https://meet.google.com/ovp-rxuf-hma';
+
+// 活動「進行中時段」：19:30–21:30 Asia/Taipei，這段時間內的報名 → 確認信/LINE 立即帶 Meet URL
+function isEventLive(now = new Date()) {
+  const tz = 'Asia/Taipei';
+  const today = now.toLocaleDateString('en-CA', { timeZone: tz });
+  if (today !== CURRENT_EVENT_DATE) return false;
+  const hhmm = now.toLocaleTimeString('en-GB', { timeZone: tz, hour12: false, hour: '2-digit', minute: '2-digit' });
+  return hhmm >= '19:30' && hhmm <= '21:30';
+}
 
 const app = express();
 app.use(cors());
@@ -113,6 +123,7 @@ async function initDB() {
   await pool.query(`ALTER TABLE registrations ADD COLUMN IF NOT EXISTS attended BOOLEAN DEFAULT FALSE`);
   await pool.query(`ALTER TABLE registrations ADD COLUMN IF NOT EXISTS event_date TEXT`);
   await pool.query(`ALTER TABLE registrations ADD COLUMN IF NOT EXISTS bind_reminded_at TIMESTAMPTZ`);
+  await pool.query(`ALTER TABLE line_bindings ADD COLUMN IF NOT EXISTS awaiting_attendance_email BOOLEAN DEFAULT FALSE`);
   // Backfill：既有資料（無 event_date）一律歸為 5/4 場次（共學聚首場）
   const backfilled = await pool.query(`UPDATE registrations SET event_date='2026-05-04' WHERE event_date IS NULL RETURNING id`);
   if (backfilled.rowCount > 0) console.log(`[DB] Backfilled event_date='2026-05-04' for ${backfilled.rowCount} legacy row(s)`);
@@ -276,17 +287,18 @@ app.post('/register', async (req, res) => {
 
     // 寄信與 LINE 通知背景執行，不阻塞回應
     const isGoing = attendance === 'Yes' || attendance === 'Maybe';
+    const liveMeetBlock = isEventLive() ? `\n💻 立即進入教室：\n${MEET_URL}\n\n🔔 19:50 開放、20:00 準時開始\n` : '';
     sendEmail(
       email,
       isGoing ? '✅ AI 共學聚 — 5/18 報名確認' : 'AI 共學聚 — 感謝填寫！',
       isGoing
-        ? `嗨 ${name}！\n\n感謝你報名 5/18 AI 共學聚 🌱\n\n📅 5/18（一）20:00–21:30 線上\n📌 主題：Claude Skills × Projects 入門實戰，打造你的 AI 內容工作流\n\n📲 完成 LINE 綁定（最後一步！）：\n${buildBindUrl(email)}\n👆 點下去登入 LINE → 同意 → 加好友 → 自動完成，30 秒內搞定\n\nMeet 連結會在活動前 24 小時 + 30 分鐘透過 LINE 通知你！\n\n— AI 共學聚團隊 🧬`
+        ? `嗨 ${name}！\n\n感謝你報名 5/18 AI 共學聚 🌱\n\n📅 5/18（一）20:00–21:30 線上\n📌 主題：Claude AI 入門實戰｜小白也能快速做出精美社群內容\n${liveMeetBlock}\n📲 完成 LINE 綁定（最後一步！）：\n${buildBindUrl(email)}\n👆 點下去登入 LINE → 同意 → 加好友 → 自動完成，30 秒內搞定\n\nMeet 連結會在活動前 24 小時 + 30 分鐘透過 LINE 通知你！\n\n— AI 共學聚團隊 🧬`
         : `嗨 ${name}！\n\n感謝你填寫表單！下一場 5/18 開課，若之後想參加歡迎再回來填一次 📅\n\n— AI 共學聚團隊 🧬`
     );
 
     if (binding.rows[0]?.line_user_id) {
       sendLine(binding.rows[0].line_user_id,
-        `嗨 ${name}！\n\n你已報名 5/18 AI 共學聚 ✅\n\n📅 5/18（一）20:00–21:30 線上見\n📌 主題：Claude Skills × Projects 入門實戰\n\n活動前會在這裡提醒你 🧬`);
+        `嗨 ${name}！\n\n你已報名 5/18 AI 共學聚 ✅\n\n📅 5/18（一）20:00–21:30 線上見\n📌 主題：Claude AI 入門實戰｜小白也能快速做出精美社群內容${isEventLive() ? `\n\n💻 立即進入教室：\n${MEET_URL}` : ''}\n\n活動前會在這裡提醒你 🧬`);
     }
   } catch (err) {
     console.error('[Register Error]', err.message);
@@ -423,9 +435,90 @@ app.post('/webhook', express.raw({ type: '*/*' }), lineMiddleware, async (req, r
       const text = event.message.text.trim();
       const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
+      // 線上點名：「報到」keyword（限當前場次 CURRENT_EVENT_DATE）— 放在 alreadyBound 之前，bound 用戶也能觸發
+      if (/^(報到|簽到|\+1|我來了|我到了)$/i.test(text)) {
+        const bindRow = await pool.query(
+          `SELECT email FROM line_bindings WHERE line_user_id=$1 AND email IS NOT NULL
+           UNION
+           SELECT email FROM registrations WHERE line_user_id=$1 AND email IS NOT NULL
+           LIMIT 1`,
+          [userId]
+        );
+        const knownEmail = bindRow.rows[0]?.email || null;
+
+        if (knownEmail) {
+          const exist = await pool.query(
+            `SELECT id, name FROM registrations WHERE line_user_id=$1 AND event_date=$2`,
+            [userId, CURRENT_EVENT_DATE]
+          );
+          let name;
+          if (exist.rows[0]) {
+            await pool.query(`UPDATE registrations SET attended=TRUE WHERE id=$1`, [exist.rows[0].id]);
+            name = exist.rows[0].name;
+          } else {
+            const other = await pool.query(
+              `SELECT name FROM registrations WHERE email=$1 ORDER BY created_at DESC LIMIT 1`,
+              [knownEmail]
+            );
+            name = other.rows[0]?.name || '(LINE 來賓)';
+            await pool.query(
+              `INSERT INTO registrations (name, email, attendance, event_date, line_user_id, attended)
+               VALUES ($1,$2,'Yes',$3,$4,TRUE)
+               ON CONFLICT (email, event_date) DO UPDATE SET attended=TRUE, line_user_id=EXCLUDED.line_user_id`,
+              [name, knownEmail, CURRENT_EVENT_DATE, userId]
+            );
+          }
+          await pool.query(`UPDATE line_bindings SET awaiting_attendance_email=FALSE WHERE line_user_id=$1`, [userId]);
+          await lineClient.replyMessage(event.replyToken, {
+            type: 'text',
+            text: `✅ 報到成功！\n\n${name} 你好！\n活動結束後簡報會寄到：\n📧 ${knownEmail}\n\n如果 Email 要改、直接傳新的 Email 給我`,
+          });
+          continue;
+        } else {
+          await pool.query(
+            `INSERT INTO line_bindings (line_user_id, awaiting_attendance_email) VALUES ($1, TRUE)
+             ON CONFLICT (line_user_id) DO UPDATE SET awaiting_attendance_email=TRUE`,
+            [userId]
+          );
+          await lineClient.replyMessage(event.replyToken, {
+            type: 'text',
+            text: `👋 找不到你的 Email 紀錄\n\n請傳你的 Email 給我（例如：yourname@gmail.com）\n活動結束後我會把簡報寄到那裡 📧`,
+          });
+          continue;
+        }
+      }
+
+      // walk-in 報到等 email：若 awaiting_attendance_email=TRUE 且使用者傳 email-format 訊息，視為 walk-in 報到
+      if (emailRe.test(text)) {
+        const awaiting = await pool.query(
+          `SELECT awaiting_attendance_email FROM line_bindings WHERE line_user_id=$1`,
+          [userId]
+        );
+        if (awaiting.rows[0]?.awaiting_attendance_email) {
+          const email = text.toLowerCase();
+          let profile;
+          try { profile = await lineClient.getProfile(userId); } catch (_) { profile = { displayName: '(LINE 來賓)' }; }
+          await pool.query(
+            `INSERT INTO registrations (name, email, attendance, event_date, line_user_id, attended)
+             VALUES ($1,$2,'Yes',$3,$4,TRUE)
+             ON CONFLICT (email, event_date) DO UPDATE SET attended=TRUE, line_user_id=EXCLUDED.line_user_id`,
+            [profile.displayName || '(LINE 來賓)', email, CURRENT_EVENT_DATE, userId]
+          );
+          await pool.query(
+            `UPDATE line_bindings SET awaiting_attendance_email=FALSE, email=$2, display_name=COALESCE(display_name,$3) WHERE line_user_id=$1`,
+            [userId, email, profile.displayName || null]
+          );
+          await lineClient.replyMessage(event.replyToken, {
+            type: 'text',
+            text: `✅ 已記下！\n\n活動結束後簡報會寄到：\n📧 ${email}\n\n等等課程見 🚀`,
+          });
+          continue;
+        }
+      }
+
       // 檢查使用者是否已綁定（line_bindings 或 registrations 任一有記錄）
       const alreadyBound = await pool.query(`
-        SELECT 1 FROM line_bindings WHERE line_user_id=$1
+        SELECT 1 FROM line_bindings WHERE line_user_id=$1 AND email IS NOT NULL AND email <> ''
         UNION ALL
         SELECT 1 FROM registrations WHERE line_user_id=$1
         LIMIT 1
@@ -544,6 +637,38 @@ app.get('/admin/api/broadcast', adminAuth, async (req, res) => {
   }
 });
 
+// 活動後寄簡報：對當前場次 attended=TRUE 的人批次寄信
+// 用法：POST /admin/api/send-slides?pw=...&event=2026-05-18&url=<簡報URL>[&dry=1]
+app.post('/admin/api/send-slides', adminAuth, async (req, res) => {
+  try {
+    const eventDate = req.query.event || CURRENT_EVENT_DATE;
+    const slidesUrl = req.query.url || req.body?.url;
+    const dryRun = req.query.dry === '1';
+    if (!slidesUrl) return res.status(400).json({ error: 'Missing ?url= (slides URL)' });
+
+    const result = await pool.query(
+      `SELECT id, name, email FROM registrations
+       WHERE event_date=$1 AND attended=TRUE
+         AND email IS NOT NULL AND email <> ''
+       ORDER BY name ASC`,
+      [eventDate]
+    );
+
+    const sent = [];
+    const subject = `📊 AI 共學聚 ${eventDate} — 簡報下載`;
+    for (const reg of result.rows) {
+      const text = `嗨 ${reg.name}！\n\n感謝參與今天的 AI 共學聚 🌱\n\n📊 本場簡報：\n${slidesUrl}\n\n下一場活動見！\nhttps://event.cosmoseed.com.tw/courses\n\n— AI 共學聚團隊 🧬`;
+      if (!dryRun) await sendEmail(reg.email, subject, text);
+      sent.push({ id: reg.id, name: reg.name, email: reg.email });
+    }
+    console.log(`[Slides] ${dryRun ? '(dry-run) ' : ''}event=${eventDate} sent=${sent.length}`);
+    res.json({ success: true, dryRun, eventDate, slidesUrl, count: sent.length, recipients: sent });
+  } catch (err) {
+    console.error('[Send Slides Error]', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.get('/admin/api/binding-stats', adminAuth, async (req, res) => {
   const renderRows = await pool.query(`
     SELECT
@@ -581,8 +706,8 @@ async function sendReminders(type = 'day') {
   );
   // ⚠️ 下一場活動前(5/18 前)請主辦人更新此處的 Meet 連結與當晚 AI 工具準備事項
   const lineMsg = type === 'hour'
-    ? `⏰ 還有 30 分鐘！\n\nAI 共學聚今晚 20:00 即將開始 🚀\n📌 Claude Skills × Projects 入門實戰\n\nMeet 連結與上課準備事項，請查看前一則 LINE 通知 📌\n\n🔔 19:50 開放進入教室\n20:00 準時開始（21:30 結束）\n\n等等見！🧬`
-    : `📅 明天提醒！\n\nAI 共學聚明天晚上 20:00–21:30\n📌 Claude Skills × Projects 入門實戰\n　　打造你的 AI 內容工作流\n\n期待明天和大家共學！🧬`;
+    ? `⏰ 還有 30 分鐘！\n\nAI 共學聚今晚 20:00 即將開始 🚀\n📌 主題：Claude AI 入門實戰｜小白也能快速做出精美社群內容\n\n💻 Meet 連結：\n${MEET_URL}\n\n🔔 19:50 開放進入教室\n20:00 準時開始（21:30 結束）\n\n📋 記得準備：筆電 + Claude 帳號（claude.ai）\n\n等等見！🧬`
+    : `📅 明天提醒！\n\nAI 共學聚明天晚上 20:00–21:30\n📌 主題：Claude AI 入門實戰｜小白也能快速做出精美社群內容\n\n期待明天和大家共學！🧬`;
   const emailSubject = type === 'hour' ? '⏰ AI 共學聚 30 分鐘後開始！' : '📅 明天提醒：AI 共學聚';
 
   for (const reg of result.rows) {
