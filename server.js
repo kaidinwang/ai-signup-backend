@@ -201,8 +201,8 @@ function buildBindUrl(email) {
 function buildBindReminderEmail(name, email) {
   const url = buildBindUrl(email);
   return {
-    subject: '📲 最後一步：1 鍵綁定 LINE 接收 5/18 Meet 連結',
-    text: `嗨 ${name}！\n\n你已報名 5/18 AI 共學聚 ✅，但還沒完成 LINE 綁定。\n\nMeet 連結與活動前提醒會優先在 LINE 通知，建議完成綁定避免漏接：\n\n📲 點下面連結一鍵綁定（登入 LINE → 同意 → 加好友 → 完成，30 秒內搞定）：\n${url}\n\n如果你不想收 LINE 提醒，可以直接忽略這封信，活動前我們也會用 Email 通知。\n\n— AI 共學聚團隊 🧬`,
+    subject: '💻 AI 共學聚 5/18 Meet 連結 — 今晚 20:00 線上見',
+    text: `嗨 ${name}！\n\n你已報名 5/18 AI 共學聚 ✅\n\n📅 5/18（一）20:00–21:30 線上\n📌 主題：Claude AI 入門實戰｜小白也能快速做出精美社群內容\n\n💻 Meet 連結：\n${MEET_URL}\n🔔 19:50 開放進入教室、20:00 準時開始\n\n📋 上課前請準備：\n1. 筆電（手機體驗會差很多）\n2. Claude 帳號（沒有可先註冊 claude.ai）\n\n────\n\n📲 想接收下次活動的 LINE 提醒？\n回我們的官方 LINE OA 完成綁定（30 秒）：\n${url}\n或在 LINE OA 對話直接傳這個 Email 給我們也行 🌱\n\n— AI 共學聚團隊 🧬`,
   };
 }
 
