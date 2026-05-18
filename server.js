@@ -636,6 +636,46 @@ app.get('/admin/api/broadcast', adminAuth, async (req, res) => {
   }
 });
 
+// 課後問卷：寄給 5/18 報名 Yes/Maybe 但「沒報到」的人（避免跟簡報+問卷信重複）
+// 用法：POST /admin/api/send-survey-only?pw=...&event=2026-05-18[&survey=<URL>][&dry=1]
+app.post('/admin/api/send-survey-only', adminAuth, async (req, res) => {
+  try {
+    const eventDate = req.query.event || CURRENT_EVENT_DATE;
+    const dryRun = req.query.dry === '1';
+    const surveyUrl = req.query.survey || 'https://forms.gle/VA4JDwSvbg13scB58';
+
+    const result = await pool.query(
+      `SELECT id, name, email FROM registrations
+       WHERE event_date=$1 AND attendance IN ('Yes','Maybe')
+         AND (attended=FALSE OR attended IS NULL)
+         AND email IS NOT NULL AND email <> ''
+       ORDER BY name ASC`,
+      [eventDate]
+    );
+
+    const sent = [];
+    const subject = `📝 AI 共學聚 ${eventDate} 課後問卷 — 給我們 2 分鐘 🌱`;
+    for (const reg of result.rows) {
+      const text = `嗨 ${reg.name}！\n\n謝謝你報名 5/18 AI 共學聚 🌱\n\n如果你今晚有參與課程、想請你花 2 分鐘填一下回饋\n你的意見會幫助我們把下一場做得更好 💚\n\n📝 課後問卷：\n${surveyUrl}\n\n下一場 6/1（一）20:00，5/25 開放報名：\nhttps://event.cosmoseed.com.tw/courses\n\n— Din Din Wang 🧬\nAI 共學聚團隊`;
+      if (!dryRun) await sendEmail(reg.email, subject, text);
+      sent.push({ id: reg.id, name: reg.name, email: reg.email });
+    }
+
+    // 副件給 admin
+    const adminEmail = process.env.EMAIL_USER;
+    if (!dryRun && adminEmail) {
+      const summary = `本場課後問卷信已寄出 ${sent.length} 封（不含 attended=TRUE 已收簡報信的人）\n\n📝 問卷連結：\n${surveyUrl}\n\n📝 收件名單：\n${sent.map((s, i) => `${i + 1}. ${s.name} <${s.email}>`).join('\n')}\n\n— AI 共學聚自動寄送 🧬`;
+      await sendEmail(adminEmail, `📝 [副件] ${eventDate} 課後問卷已寄出 (${sent.length} 人)`, summary);
+    }
+
+    console.log(`[SurveyOnly] ${dryRun ? '(dry-run) ' : ''}event=${eventDate} sent=${sent.length}`);
+    res.json({ success: true, dryRun, eventDate, surveyUrl, count: sent.length, recipients: sent });
+  } catch (err) {
+    console.error('[Send Survey Only Error]', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // 活動後寄簡報：對當前場次 attended=TRUE 的人批次寄信
 // 用法：POST /admin/api/send-slides?pw=...&event=2026-05-18&url=<簡報URL>[&dry=1]
 app.post('/admin/api/send-slides', adminAuth, async (req, res) => {
@@ -653,10 +693,11 @@ app.post('/admin/api/send-slides', adminAuth, async (req, res) => {
       [eventDate]
     );
 
+    const surveyUrl = req.query.survey || 'https://forms.gle/VA4JDwSvbg13scB58';
     const sent = [];
-    const subject = `📊 AI 共學聚 ${eventDate} — 簡報下載`;
+    const subject = `📊 AI 共學聚 ${eventDate} — 簡報 + 課後問卷`;
     for (const reg of result.rows) {
-      const text = `嗨 ${reg.name}！\n\n感謝參與今天的 AI 共學聚 🌱\n\n📊 本場簡報：\n${slidesUrl}\n\n下一場活動見！\nhttps://event.cosmoseed.com.tw/courses\n\n— AI 共學聚團隊 🧬`;
+      const text = `嗨 ${reg.name}！\n\n謝謝你今晚參與 5/18 AI 共學聚 — Claude AI 入門實戰 🌱\n\n📊 本場簡報：\n${slidesUrl}\n\n📝 課後問卷（2 分鐘）：\n${surveyUrl}\n你的回饋會幫助我們把下一場做得更好 💚\n\n下一場 6/1（一）20:00，5/25 開放報名：\nhttps://event.cosmoseed.com.tw/courses\n\n— Din Din Wang 🧬\nAI 共學聚團隊`;
       if (!dryRun) await sendEmail(reg.email, subject, text);
       sent.push({ id: reg.id, name: reg.name, email: reg.email });
     }
