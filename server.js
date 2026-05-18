@@ -807,6 +807,46 @@ async function sendInviteToUnregistered({ eventDate = null, dryRun = false } = {
   return sent;
 }
 
+// 寄邀請信給「曾報名過舊場次但本場未報名 + 不在 line_bindings（避免重複）」的人
+// 用法：GET /admin/api/send-invite-past-registrants?pw=...&event=2026-05-18[&dry=1]
+app.get('/admin/api/send-invite-past-registrants', adminAuth, async (req, res) => {
+  try {
+    const eventDate = req.query.event || CURRENT_EVENT_DATE;
+    const dryRun = req.query.dry === '1';
+    const result = await pool.query(`
+      WITH past_unique AS (
+        SELECT DISTINCT ON (LOWER(TRIM(email))) email, name
+        FROM registrations
+        WHERE email IS NOT NULL AND email <> '' AND event_date <> $1
+        ORDER BY LOWER(TRIM(email)), created_at DESC
+      )
+      SELECT pu.email, pu.name
+      FROM past_unique pu
+      WHERE NOT EXISTS (
+        SELECT 1 FROM registrations r2
+        WHERE LOWER(TRIM(r2.email)) = LOWER(TRIM(pu.email)) AND r2.event_date = $1
+      )
+      AND NOT EXISTS (
+        SELECT 1 FROM line_bindings lb
+        WHERE LOWER(TRIM(lb.email)) = LOWER(TRIM(pu.email))
+      )
+    `, [eventDate]);
+
+    const subject = '🌱 今晚 20:00 AI 共學聚第二期 — 還沒報名嗎？';
+    const sent = [];
+    for (const r of result.rows) {
+      const text = `嗨 ${r.name}！\n\n我是 Din 🌱\n\n還記得上一堂課我們用 Gemini 作行事曆，是不是簡單又有趣？\n這次第二期我們換主角上課啦！\n\n從零開始、手把手帶你用 Claude AI 一步步做出精美社群內容\n不藏私的實戰教學，幫你把 AI 真的帶進日常工作裡 🌱\n\n📌 主題：Claude AI 入門實戰｜小白也能快速做出精美社群內容\n📅 課程：5/18（一）20:00–21:30 線上\n\n🎫 報名連結（今晚 19:00 截止）：\n👉 https://event.cosmoseed.com.tw\n\n報名成功後 Meet 連結會立刻寄到你的信箱 📧\n\n📋 上課前請準備：\n1. 筆電（手機體驗會差很多）\n2. Claude 帳號（沒有可先註冊 claude.ai）\n\n19:50 開放進入教室、20:00 準時開始 🚀\n\n— Din 🧬`;
+      if (!dryRun) await sendEmail(r.email, subject, text);
+      sent.push({ email: r.email, name: r.name });
+    }
+    console.log(`[InvitePastRegistrants] ${dryRun ? '(dry-run) ' : ''}event=${eventDate} sent=${sent.length}`);
+    res.json({ success: true, dryRun, eventDate, count: sent.length, recipients: sent });
+  } catch (err) {
+    console.error('[Invite Past Registrants Error]', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // 用法：GET /admin/api/send-invite-unregistered?pw=...&event=2026-05-18[&dry=1]
 app.get('/admin/api/send-invite-unregistered', adminAuth, async (req, res) => {
   try {
