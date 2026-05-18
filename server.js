@@ -83,6 +83,11 @@ app.use((req, res, next) => {
   next();
 });
 
+// 根目錄改導向課程列表頁（5/18 後預設行為）
+// 想直接看舊報名表單請走 /register
+app.get('/', (req, res) => res.redirect(302, '/courses'));
+app.get('/register', (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
+
 app.use(express.static(path.join(__dirname, 'public'), { extensions: ['html'] }));
 
 // ─── Database (PostgreSQL) ───────────────────────────────────────────────────
