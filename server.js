@@ -860,6 +860,25 @@ async function sendInviteToUnregistered({ eventDate = null, dryRun = false } = {
   return sent;
 }
 
+// 測試 SMTP：寄一封給指定 email 並回傳真實 error（不吞）
+// 用法：GET /admin/api/test-email?pw=...&to=test@example.com
+app.get('/admin/api/test-email', adminAuth, async (req, res) => {
+  const to = req.query.to;
+  if (!to) return res.status(400).json({ error: 'missing ?to=' });
+  if (!mailer) return res.status(500).json({ error: 'mailer not initialized — check EMAIL_USER env var' });
+  try {
+    const info = await mailer.sendMail({
+      from: `"${process.env.EMAIL_FROM_NAME || 'AI 共學聚'}" <${process.env.EMAIL_USER}>`,
+      to,
+      subject: 'SMTP test — ' + new Date().toISOString(),
+      text: 'This is a test email from /admin/api/test-email endpoint. If you see this, Gmail SMTP is working.',
+    });
+    res.json({ success: true, messageId: info.messageId, response: info.response, accepted: info.accepted, rejected: info.rejected });
+  } catch (err) {
+    res.status(500).json({ error: err.message, code: err.code, command: err.command, responseCode: err.responseCode });
+  }
+});
+
 // 緊急：對當前場次全員（不分綁定）寄 Email Meet URL。LINE quota 爆掉時 fallback 用
 // 用法：GET /admin/api/send-meet-emergency?pw=...&event=2026-05-18[&dry=1]
 app.get('/admin/api/send-meet-emergency', adminAuth, async (req, res) => {
