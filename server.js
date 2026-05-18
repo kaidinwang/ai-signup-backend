@@ -807,6 +807,33 @@ async function sendInviteToUnregistered({ eventDate = null, dryRun = false } = {
   return sent;
 }
 
+// 緊急：對當前場次全員（不分綁定）寄 Email Meet URL。LINE quota 爆掉時 fallback 用
+// 用法：GET /admin/api/send-meet-emergency?pw=...&event=2026-05-18[&dry=1]
+app.get('/admin/api/send-meet-emergency', adminAuth, async (req, res) => {
+  try {
+    const eventDate = req.query.event || CURRENT_EVENT_DATE;
+    const dryRun = req.query.dry === '1';
+    const result = await pool.query(
+      `SELECT id, name, email FROM registrations
+       WHERE event_date=$1 AND attendance IN ('Yes','Maybe')
+         AND email IS NOT NULL AND email <> ''`,
+      [eventDate]
+    );
+    const subject = '⏰ AI 共學聚 — Meet 連結（再次傳送）';
+    const sent = [];
+    for (const r of result.rows) {
+      const text = `嗨 ${r.name}！\n\nAI 共學聚 5/18 即將開始 🚀\n\n💻 Meet 連結：\n${MEET_URL}\n\n🔔 19:50 開放進入教室、20:00 準時開始\n📌 主題：Claude AI 入門實戰｜小白也能快速做出精美社群內容\n\n📋 記得準備：筆電 + Claude 帳號（claude.ai）\n\n等等見！🧬`;
+      if (!dryRun) await sendEmail(r.email, subject, text);
+      sent.push({ id: r.id, name: r.name, email: r.email });
+    }
+    console.log(`[MeetEmergency] ${dryRun ? '(dry-run) ' : ''}event=${eventDate} sent=${sent.length}`);
+    res.json({ success: true, dryRun, eventDate, count: sent.length, recipients: sent });
+  } catch (err) {
+    console.error('[Meet Emergency Error]', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // 寄邀請信給「曾報名過舊場次但本場未報名 + 不在 line_bindings（避免重複）」的人
 // 用法：GET /admin/api/send-invite-past-registrants?pw=...&event=2026-05-18[&dry=1]
 app.get('/admin/api/send-invite-past-registrants', adminAuth, async (req, res) => {
