@@ -970,114 +970,26 @@ cron.schedule('0 12 * * *', () => {
     .catch(err => console.error('[BindReminder Cron Error]', err.message));
 }, { timezone: 'Asia/Taipei' });
 
-// ─── ECPay 付款通知 → LINE Push（Gmail polling）────────────────────────────────
-// 流程：客戶刷綠界 → 綠界自動寄通知信給商家 → 本服務每 2 分鐘 poll Gmail →
-//      找到未讀的綠界信 → parse 訂單資訊 → push LINE 給 admin → 標記已讀
+// ─── ECPay 付款通知 → LINE Push（Gmail IMAP polling）────────────────────────────
+// 流程：客戶刷綠界 → 綠界自動寄通知信給商家 → 本服務每 2 分鐘 IMAP 連 Gmail →
+//      找未讀的綠界信 → parse 訂單資訊 → push LINE 給 admin → 標記已讀
+//
+// 用 App Password + IMAP（非 OAuth），避開 testing app 7 天 token 過期問題。
 //
 // 環境變數：
-//   GMAIL_CLIENT_ID, GMAIL_CLIENT_SECRET, GMAIL_REFRESH_TOKEN  - Google OAuth
-//   ADMIN_LINE_USER_ID   - 收通知的個人 LINE userId（用 @795qxcio bot push）
-//   ECPAY_SENDER         - 綠界寄件人（預設 service@ecpay.com.tw）
+//   GMAIL_USER          - kaidinwang@gmail.com
+//   GMAIL_APP_PASSWORD  - Gmail 應用程式專用密碼（16 位，從 myaccount.google.com/apppasswords 產生）
+//   ADMIN_LINE_USER_ID  - 收通知的個人 LINE userId
+//   ECPAY_SENDER        - 綠界寄件人（預設 service@ecpay.com.tw）
 
-const GMAIL_CLIENT_ID = process.env.GMAIL_CLIENT_ID || '';
-const GMAIL_CLIENT_SECRET = process.env.GMAIL_CLIENT_SECRET || '';
-const GMAIL_REFRESH_TOKEN = process.env.GMAIL_REFRESH_TOKEN || '';
+const { ImapFlow } = require('imapflow');
+const { simpleParser } = require('mailparser');
+
+const GMAIL_USER = process.env.GMAIL_USER || '';
+const GMAIL_APP_PASSWORD = process.env.GMAIL_APP_PASSWORD || '';
 const ADMIN_LINE_USER_ID = process.env.ADMIN_LINE_USER_ID || '';
 const ECPAY_SENDER = process.env.ECPAY_SENDER || 'service@ecpay.com.tw';
 
-let gmailAccessToken = null;
-let gmailTokenExpiry = 0;
-
-function httpsRequestJSON(method, url, { headers = {}, body } = {}) {
-  return new Promise((resolve, reject) => {
-    const u = new URL(url);
-    const req = https.request({
-      hostname: u.hostname,
-      path: u.pathname + (u.search || ''),
-      method,
-      headers,
-    }, res => {
-      let data = '';
-      res.on('data', c => data += c);
-      res.on('end', () => {
-        if (!data) return resolve({});
-        try { resolve(JSON.parse(data)); }
-        catch (e) { reject(new Error(`Bad JSON from ${url}: ${data.slice(0, 200)}`)); }
-      });
-    });
-    req.on('error', reject);
-    if (body) req.write(typeof body === 'string' ? body : JSON.stringify(body));
-    req.end();
-  });
-}
-
-async function getGmailAccessToken() {
-  if (gmailAccessToken && Date.now() < gmailTokenExpiry) return gmailAccessToken;
-  const body = new URLSearchParams({
-    client_id: GMAIL_CLIENT_ID,
-    client_secret: GMAIL_CLIENT_SECRET,
-    refresh_token: GMAIL_REFRESH_TOKEN,
-    grant_type: 'refresh_token',
-  }).toString();
-  const data = await httpsRequestJSON('POST', 'https://oauth2.googleapis.com/token', {
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'Content-Length': Buffer.byteLength(body) },
-    body,
-  });
-  if (!data.access_token) throw new Error('Gmail token refresh failed: ' + JSON.stringify(data));
-  gmailAccessToken = data.access_token;
-  gmailTokenExpiry = Date.now() + 50 * 60 * 1000; // refresh after 50 min
-  return gmailAccessToken;
-}
-
-function gmailHeaders(token) {
-  return { Authorization: `Bearer ${token}` };
-}
-
-// 抓最近 1 天未讀的綠界信
-async function listUnreadEcpayMessages(token) {
-  const q = encodeURIComponent(`from:${ECPAY_SENDER} is:unread newer_than:1d`);
-  const data = await httpsRequestJSON('GET',
-    `https://gmail.googleapis.com/gmail/v1/users/me/messages?q=${q}`,
-    { headers: gmailHeaders(token) });
-  return data.messages || [];
-}
-
-async function getMessageDetail(id, token) {
-  return httpsRequestJSON('GET',
-    `https://gmail.googleapis.com/gmail/v1/users/me/messages/${id}?format=full`,
-    { headers: gmailHeaders(token) });
-}
-
-async function markGmailRead(id, token) {
-  return httpsRequestJSON('POST',
-    `https://gmail.googleapis.com/gmail/v1/users/me/messages/${id}/modify`,
-    {
-      headers: { ...gmailHeaders(token), 'Content-Type': 'application/json' },
-      body: { removeLabelIds: ['UNREAD'] },
-    });
-}
-
-// 從 Gmail message payload 遞迴抓出 text/plain 或 text/html 主體（base64url 解碼）
-function decodeGmailBody(payload) {
-  if (!payload) return '';
-  if (payload.body && payload.body.data) {
-    return Buffer.from(payload.body.data, 'base64').toString('utf-8');
-  }
-  if (Array.isArray(payload.parts)) {
-    // 偏好 text/plain
-    const plain = payload.parts.find(p => p.mimeType === 'text/plain');
-    if (plain) return decodeGmailBody(plain);
-    const html = payload.parts.find(p => p.mimeType === 'text/html');
-    if (html) return decodeGmailBody(html);
-    for (const p of payload.parts) {
-      const sub = decodeGmailBody(p);
-      if (sub) return sub;
-    }
-  }
-  return '';
-}
-
-// 去 HTML tag + 解 entity，得到純文字便於正則
 function htmlToText(s) {
   return String(s || '')
     .replace(/<style[\s\S]*?<\/style>/gi, ' ')
@@ -1106,7 +1018,7 @@ function parseEcpayBody(text) {
 }
 
 function formatPaymentNotice(info, subject) {
-  const lines = [
+  return [
     '💰 新訂單付款通知',
     '',
     `📦 商品：${info.productName || '(未解析)'}`,
@@ -1117,37 +1029,58 @@ function formatPaymentNotice(info, subject) {
     '',
     '👉 等客戶 LINE 私訊 @795qxcio',
     '原信主旨：' + (subject || ''),
-  ];
-  return lines.join('\n');
+  ].join('\n');
 }
 
+let pollLock = false; // 避免 2 分鐘 cron 重疊（萬一上次還沒跑完）
+
 async function pollEcpayPayments() {
-  if (!GMAIL_REFRESH_TOKEN || !ADMIN_LINE_USER_ID || !lineClient) return;
+  if (!GMAIL_USER || !GMAIL_APP_PASSWORD || !ADMIN_LINE_USER_ID || !lineClient) return;
+  if (pollLock) return;
+  pollLock = true;
+
+  const client = new ImapFlow({
+    host: 'imap.gmail.com',
+    port: 993,
+    secure: true,
+    auth: { user: GMAIL_USER, pass: GMAIL_APP_PASSWORD },
+    logger: false,
+  });
+
   try {
-    const token = await getGmailAccessToken();
-    const msgs = await listUnreadEcpayMessages(token);
-    if (!msgs.length) return;
-    console.log(`[ECPay Poll] Found ${msgs.length} new payment notification(s)`);
+    await client.connect();
+    const lock = await client.getMailboxLock('INBOX');
+    try {
+      // 找最近 1 天、未讀、寄件人是 ECPay 的信
+      const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
+      const uids = await client.search({ seen: false, from: ECPAY_SENDER, since });
+      if (!uids || !uids.length) return;
+      console.log(`[ECPay Poll] Found ${uids.length} unread ECPay email(s)`);
 
-    for (const m of msgs) {
-      try {
-        const detail = await getMessageDetail(m.id, token);
-        const headers = detail.payload?.headers || [];
-        const subject = headers.find(h => h.name === 'Subject')?.value || '';
-        const raw = decodeGmailBody(detail.payload);
-        const text = htmlToText(raw);
-        const info = parseEcpayBody(text);
-        const msgText = formatPaymentNotice(info, subject);
+      for (const uid of uids) {
+        try {
+          const msg = await client.fetchOne(uid, { source: true, envelope: true }, { uid: true });
+          const parsed = await simpleParser(msg.source);
+          const subject = parsed.subject || msg.envelope?.subject || '';
+          const bodyText = parsed.text || htmlToText(parsed.html || '');
+          const info = parseEcpayBody(bodyText);
+          const text = formatPaymentNotice(info, subject);
 
-        await lineClient.pushMessage(ADMIN_LINE_USER_ID, { type: 'text', text: msgText });
-        await markGmailRead(m.id, token);
-        console.log(`[ECPay Poll] Notified order ${info.orderNo || m.id}`);
-      } catch (e) {
-        console.error(`[ECPay Poll] Failed on msg ${m.id}:`, e.message);
+          await lineClient.pushMessage(ADMIN_LINE_USER_ID, { type: 'text', text });
+          await client.messageFlagsAdd(uid, ['\\Seen'], { uid: true });
+          console.log(`[ECPay Poll] Notified order ${info.orderNo || uid}`);
+        } catch (e) {
+          console.error(`[ECPay Poll] Failed on uid ${uid}:`, e.message);
+        }
       }
+    } finally {
+      lock.release();
     }
   } catch (e) {
     console.error('[ECPay Poll Error]', e.message);
+  } finally {
+    try { await client.logout(); } catch {}
+    pollLock = false;
   }
 }
 
@@ -1156,14 +1089,15 @@ cron.schedule('*/2 * * * *', pollEcpayPayments);
 // 啟動後 15 秒先跑一次
 setTimeout(pollEcpayPayments, 15000);
 
-// 手動觸發端點（測試用，會檢查所有條件並回報狀態）
+// 手動觸發端點（測試用）
 app.get('/admin/ecpay-poll', async (req, res) => {
   if (req.query.key !== process.env.ADMIN_KEY) return res.status(403).json({ error: 'forbidden' });
   await pollEcpayPayments();
   res.json({
     ok: true,
     config: {
-      gmail: !!GMAIL_REFRESH_TOKEN,
+      gmailUser: !!GMAIL_USER,
+      gmailPassword: !!GMAIL_APP_PASSWORD,
       adminLine: !!ADMIN_LINE_USER_ID,
       lineClient: !!lineClient,
     }
@@ -1179,11 +1113,12 @@ initDB().then(() => {
     console.log(`   LINE:  ${lineClient ? '已設定' : '未設定'}`);
     console.log(`   LINE Login Channel ID: ${process.env.LINE_LOGIN_CHANNEL_ID || '❌ 未設定'}`);
     console.log(`   LINE Login Channel Secret: ${process.env.LINE_LOGIN_CHANNEL_SECRET ? '✅ 已設定' : '❌ 未設定'}`);
-    const ecpayReady = GMAIL_REFRESH_TOKEN && ADMIN_LINE_USER_ID && lineClient;
-    console.log(`   ECPay→LINE 通知: ${ecpayReady ? '✅ 已啟用（每 2 分鐘 poll Gmail）' : '❌ 未啟用'}`);
+    const ecpayReady = GMAIL_USER && GMAIL_APP_PASSWORD && ADMIN_LINE_USER_ID && lineClient;
+    console.log(`   ECPay→LINE 通知: ${ecpayReady ? '✅ 已啟用（每 2 分鐘 IMAP poll Gmail）' : '❌ 未啟用'}`);
     if (!ecpayReady) {
-      console.log(`     ↳ GMAIL_REFRESH_TOKEN: ${GMAIL_REFRESH_TOKEN ? '✅' : '❌'}`);
-      console.log(`     ↳ ADMIN_LINE_USER_ID:  ${ADMIN_LINE_USER_ID ? '✅' : '❌'}`);
+      console.log(`     ↳ GMAIL_USER:         ${GMAIL_USER ? '✅' : '❌'}`);
+      console.log(`     ↳ GMAIL_APP_PASSWORD: ${GMAIL_APP_PASSWORD ? '✅' : '❌'}`);
+      console.log(`     ↳ ADMIN_LINE_USER_ID: ${ADMIN_LINE_USER_ID ? '✅' : '❌'}`);
     }
   });
 }).catch(err => {
