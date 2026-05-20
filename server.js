@@ -2,7 +2,7 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const { Pool } = require('pg');
-const nodemailer = require('nodemailer');
+const { Resend } = require('resend');
 const line = require('@line/bot-sdk');
 const cron = require('node-cron');
 const path = require('path');
@@ -165,26 +165,30 @@ const lineClient = lineConfig.channelAccessToken
   : null;
 
 // ─── Email ───────────────────────────────────────────────────────────────────
-const mailer = process.env.EMAIL_USER
-  ? nodemailer.createTransport({
-      service: 'gmail',
-      auth: { user: process.env.EMAIL_USER, pass: process.env.EMAIL_APP_PASSWORD },
-      connectionTimeout: 5000,
-      greetingTimeout: 5000,
-      socketTimeout: 10000,
-    })
-  : null;
+const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
+const EMAIL_FROM = `${process.env.EMAIL_FROM_NAME || 'AI 共學聚'} <${process.env.EMAIL_FROM || 'noreply@cosmoseed.com.tw'}>`;
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
-async function sendEmail(to, subject, text) {
-  if (!mailer) return;
+async function sendEmail(to, subject, text, html) {
+  if (!resend) {
+    console.error('[Email Skip]', to, 'RESEND_API_KEY not set');
+    return { ok: false, error: 'resend not configured' };
+  }
   try {
-    await mailer.sendMail({
-      from: `"${process.env.EMAIL_FROM_NAME || 'AI 共學聚'}" <${process.env.EMAIL_USER}>`,
+    const { data, error } = await resend.emails.send({
+      from: EMAIL_FROM,
       to, subject, text,
+      ...(html ? { html } : {}),
     });
+    if (error) {
+      console.error('[Email Fail]', to, error.message || error.name || JSON.stringify(error));
+      return { ok: false, error: error.message || String(error) };
+    }
+    console.log('[Email OK]', to, data.id);
+    return { ok: true, id: data.id };
   } catch (err) {
-    console.error('[Email Error]', err.message);
+    console.error('[Email Fail]', to, err.message);
+    return { ok: false, error: err.message };
   }
 }
 
@@ -865,17 +869,18 @@ async function sendInviteToUnregistered({ eventDate = null, dryRun = false } = {
 app.get('/admin/api/test-email', adminAuth, async (req, res) => {
   const to = req.query.to;
   if (!to) return res.status(400).json({ error: 'missing ?to=' });
-  if (!mailer) return res.status(500).json({ error: 'mailer not initialized — check EMAIL_USER env var' });
+  if (!resend) return res.status(500).json({ error: 'resend not initialized — check RESEND_API_KEY env var' });
   try {
-    const info = await mailer.sendMail({
-      from: `"${process.env.EMAIL_FROM_NAME || 'AI 共學聚'}" <${process.env.EMAIL_USER}>`,
+    const { data, error } = await resend.emails.send({
+      from: EMAIL_FROM,
       to,
-      subject: 'SMTP test — ' + new Date().toISOString(),
-      text: 'This is a test email from /admin/api/test-email endpoint. If you see this, Gmail SMTP is working.',
+      subject: 'Resend test — ' + new Date().toISOString(),
+      text: 'This is a test email from /admin/api/test-email endpoint. If you see this, Resend is working.',
     });
-    res.json({ success: true, messageId: info.messageId, response: info.response, accepted: info.accepted, rejected: info.rejected });
+    if (error) return res.status(500).json({ error: error.message || String(error), name: error.name });
+    res.json({ success: true, id: data.id });
   } catch (err) {
-    res.status(500).json({ error: err.message, code: err.code, command: err.command, responseCode: err.responseCode });
+    res.status(500).json({ error: err.message });
   }
 });
 
@@ -965,6 +970,206 @@ cron.schedule('0 12 * * *', () => {
     .catch(err => console.error('[BindReminder Cron Error]', err.message));
 }, { timezone: 'Asia/Taipei' });
 
+// ─── ECPay 付款通知 → LINE Push（Gmail polling）────────────────────────────────
+// 流程：客戶刷綠界 → 綠界自動寄通知信給商家 → 本服務每 2 分鐘 poll Gmail →
+//      找到未讀的綠界信 → parse 訂單資訊 → push LINE 給 admin → 標記已讀
+//
+// 環境變數：
+//   GMAIL_CLIENT_ID, GMAIL_CLIENT_SECRET, GMAIL_REFRESH_TOKEN  - Google OAuth
+//   ADMIN_LINE_USER_ID   - 收通知的個人 LINE userId（用 @795qxcio bot push）
+//   ECPAY_SENDER         - 綠界寄件人（預設 service@ecpay.com.tw）
+
+const GMAIL_CLIENT_ID = process.env.GMAIL_CLIENT_ID || '';
+const GMAIL_CLIENT_SECRET = process.env.GMAIL_CLIENT_SECRET || '';
+const GMAIL_REFRESH_TOKEN = process.env.GMAIL_REFRESH_TOKEN || '';
+const ADMIN_LINE_USER_ID = process.env.ADMIN_LINE_USER_ID || '';
+const ECPAY_SENDER = process.env.ECPAY_SENDER || 'service@ecpay.com.tw';
+
+let gmailAccessToken = null;
+let gmailTokenExpiry = 0;
+
+function httpsRequestJSON(method, url, { headers = {}, body } = {}) {
+  return new Promise((resolve, reject) => {
+    const u = new URL(url);
+    const req = https.request({
+      hostname: u.hostname,
+      path: u.pathname + (u.search || ''),
+      method,
+      headers,
+    }, res => {
+      let data = '';
+      res.on('data', c => data += c);
+      res.on('end', () => {
+        if (!data) return resolve({});
+        try { resolve(JSON.parse(data)); }
+        catch (e) { reject(new Error(`Bad JSON from ${url}: ${data.slice(0, 200)}`)); }
+      });
+    });
+    req.on('error', reject);
+    if (body) req.write(typeof body === 'string' ? body : JSON.stringify(body));
+    req.end();
+  });
+}
+
+async function getGmailAccessToken() {
+  if (gmailAccessToken && Date.now() < gmailTokenExpiry) return gmailAccessToken;
+  const body = new URLSearchParams({
+    client_id: GMAIL_CLIENT_ID,
+    client_secret: GMAIL_CLIENT_SECRET,
+    refresh_token: GMAIL_REFRESH_TOKEN,
+    grant_type: 'refresh_token',
+  }).toString();
+  const data = await httpsRequestJSON('POST', 'https://oauth2.googleapis.com/token', {
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'Content-Length': Buffer.byteLength(body) },
+    body,
+  });
+  if (!data.access_token) throw new Error('Gmail token refresh failed: ' + JSON.stringify(data));
+  gmailAccessToken = data.access_token;
+  gmailTokenExpiry = Date.now() + 50 * 60 * 1000; // refresh after 50 min
+  return gmailAccessToken;
+}
+
+function gmailHeaders(token) {
+  return { Authorization: `Bearer ${token}` };
+}
+
+// 抓最近 1 天未讀的綠界信
+async function listUnreadEcpayMessages(token) {
+  const q = encodeURIComponent(`from:${ECPAY_SENDER} is:unread newer_than:1d`);
+  const data = await httpsRequestJSON('GET',
+    `https://gmail.googleapis.com/gmail/v1/users/me/messages?q=${q}`,
+    { headers: gmailHeaders(token) });
+  return data.messages || [];
+}
+
+async function getMessageDetail(id, token) {
+  return httpsRequestJSON('GET',
+    `https://gmail.googleapis.com/gmail/v1/users/me/messages/${id}?format=full`,
+    { headers: gmailHeaders(token) });
+}
+
+async function markGmailRead(id, token) {
+  return httpsRequestJSON('POST',
+    `https://gmail.googleapis.com/gmail/v1/users/me/messages/${id}/modify`,
+    {
+      headers: { ...gmailHeaders(token), 'Content-Type': 'application/json' },
+      body: { removeLabelIds: ['UNREAD'] },
+    });
+}
+
+// 從 Gmail message payload 遞迴抓出 text/plain 或 text/html 主體（base64url 解碼）
+function decodeGmailBody(payload) {
+  if (!payload) return '';
+  if (payload.body && payload.body.data) {
+    return Buffer.from(payload.body.data, 'base64').toString('utf-8');
+  }
+  if (Array.isArray(payload.parts)) {
+    // 偏好 text/plain
+    const plain = payload.parts.find(p => p.mimeType === 'text/plain');
+    if (plain) return decodeGmailBody(plain);
+    const html = payload.parts.find(p => p.mimeType === 'text/html');
+    if (html) return decodeGmailBody(html);
+    for (const p of payload.parts) {
+      const sub = decodeGmailBody(p);
+      if (sub) return sub;
+    }
+  }
+  return '';
+}
+
+// 去 HTML tag + 解 entity，得到純文字便於正則
+function htmlToText(s) {
+  return String(s || '')
+    .replace(/<style[\s\S]*?<\/style>/gi, ' ')
+    .replace(/<script[\s\S]*?<\/script>/gi, ' ')
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<\/?[^>]+>/g, ' ')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/[ \t]+/g, ' ')
+    .replace(/\n\s+/g, '\n')
+    .trim();
+}
+
+function parseEcpayBody(text) {
+  const pick = (re) => (text.match(re) || [])[1]?.trim();
+  return {
+    orderNo: pick(/(?:訂單編號|MerchantTradeNo|商店訂單編號)[\s：:]*([A-Za-z0-9\-_]+)/),
+    amount: pick(/(?:交易金額|金額|TradeAmt)[\s：:]*NT?\$?\s*([\d,]+)/),
+    method: pick(/(?:付款方式|PaymentType)[\s：:]*([^\n\r<]+?)(?=\s{2,}|\n|$)/),
+    tradeTime: pick(/(?:交易時間|付款時間|PaymentDate)[\s：:]*([\d\-:\s\/]+)/),
+    productName: pick(/(?:商品名稱|ItemName)[\s：:]*([^\n\r<]+?)(?=\s{2,}|\n|$)/),
+  };
+}
+
+function formatPaymentNotice(info, subject) {
+  const lines = [
+    '💰 新訂單付款通知',
+    '',
+    `📦 商品：${info.productName || '(未解析)'}`,
+    `🔢 訂單編號：${info.orderNo || '(未解析)'}`,
+    `💵 金額：NT$${info.amount || '?'}`,
+    `💳 付款方式：${info.method || '?'}`,
+    `🕐 交易時間：${info.tradeTime || '?'}`,
+    '',
+    '👉 等客戶 LINE 私訊 @795qxcio',
+    '原信主旨：' + (subject || ''),
+  ];
+  return lines.join('\n');
+}
+
+async function pollEcpayPayments() {
+  if (!GMAIL_REFRESH_TOKEN || !ADMIN_LINE_USER_ID || !lineClient) return;
+  try {
+    const token = await getGmailAccessToken();
+    const msgs = await listUnreadEcpayMessages(token);
+    if (!msgs.length) return;
+    console.log(`[ECPay Poll] Found ${msgs.length} new payment notification(s)`);
+
+    for (const m of msgs) {
+      try {
+        const detail = await getMessageDetail(m.id, token);
+        const headers = detail.payload?.headers || [];
+        const subject = headers.find(h => h.name === 'Subject')?.value || '';
+        const raw = decodeGmailBody(detail.payload);
+        const text = htmlToText(raw);
+        const info = parseEcpayBody(text);
+        const msgText = formatPaymentNotice(info, subject);
+
+        await lineClient.pushMessage(ADMIN_LINE_USER_ID, { type: 'text', text: msgText });
+        await markGmailRead(m.id, token);
+        console.log(`[ECPay Poll] Notified order ${info.orderNo || m.id}`);
+      } catch (e) {
+        console.error(`[ECPay Poll] Failed on msg ${m.id}:`, e.message);
+      }
+    }
+  } catch (e) {
+    console.error('[ECPay Poll Error]', e.message);
+  }
+}
+
+// 每 2 分鐘 poll 一次
+cron.schedule('*/2 * * * *', pollEcpayPayments);
+// 啟動後 15 秒先跑一次
+setTimeout(pollEcpayPayments, 15000);
+
+// 手動觸發端點（測試用，會檢查所有條件並回報狀態）
+app.get('/admin/ecpay-poll', async (req, res) => {
+  if (req.query.key !== process.env.ADMIN_KEY) return res.status(403).json({ error: 'forbidden' });
+  await pollEcpayPayments();
+  res.json({
+    ok: true,
+    config: {
+      gmail: !!GMAIL_REFRESH_TOKEN,
+      adminLine: !!ADMIN_LINE_USER_ID,
+      lineClient: !!lineClient,
+    }
+  });
+});
+
 // ─── Start ───────────────────────────────────────────────────────────────────
 const PORT = process.env.PORT || 3000;
 initDB().then(() => {
@@ -974,6 +1179,12 @@ initDB().then(() => {
     console.log(`   LINE:  ${lineClient ? '已設定' : '未設定'}`);
     console.log(`   LINE Login Channel ID: ${process.env.LINE_LOGIN_CHANNEL_ID || '❌ 未設定'}`);
     console.log(`   LINE Login Channel Secret: ${process.env.LINE_LOGIN_CHANNEL_SECRET ? '✅ 已設定' : '❌ 未設定'}`);
+    const ecpayReady = GMAIL_REFRESH_TOKEN && ADMIN_LINE_USER_ID && lineClient;
+    console.log(`   ECPay→LINE 通知: ${ecpayReady ? '✅ 已啟用（每 2 分鐘 poll Gmail）' : '❌ 未啟用'}`);
+    if (!ecpayReady) {
+      console.log(`     ↳ GMAIL_REFRESH_TOKEN: ${GMAIL_REFRESH_TOKEN ? '✅' : '❌'}`);
+      console.log(`     ↳ ADMIN_LINE_USER_ID:  ${ADMIN_LINE_USER_ID ? '✅' : '❌'}`);
+    }
   });
 }).catch(err => {
   console.error('DB 連線失敗:', err.message);
