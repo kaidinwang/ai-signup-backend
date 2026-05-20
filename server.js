@@ -1077,7 +1077,14 @@ async function pollEcpayPayments() {
       lock.release();
     }
   } catch (e) {
-    console.error('[ECPay Poll Error]', e.message);
+    const detail = [
+      e.code,
+      e.authenticationFailed && 'auth_failed',
+      e.responseText,
+      e.response,
+      e.message,
+    ].filter(Boolean).join(' | ');
+    console.error('[ECPay Poll Error]', detail);
   } finally {
     try { await client.logout(); } catch {}
     pollLock = false;
