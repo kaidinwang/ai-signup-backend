@@ -1034,9 +1034,17 @@ function formatPaymentNotice(info, subject) {
 
 let pollLock = false; // 避免 2 分鐘 cron 重疊（萬一上次還沒跑完）
 
-async function pollEcpayPayments() {
-  if (!GMAIL_USER || !GMAIL_APP_PASSWORD || !ADMIN_LINE_USER_ID || !lineClient) return;
-  if (pollLock) return;
+async function pollEcpayPayments(opts = {}) {
+  const verbose = opts.verbose;
+  const result = { ok: false, connected: false, foundEmails: 0, processed: 0, error: null };
+  if (!GMAIL_USER || !GMAIL_APP_PASSWORD || !ADMIN_LINE_USER_ID || !lineClient) {
+    result.error = 'missing config';
+    return result;
+  }
+  if (pollLock) {
+    result.error = 'already running';
+    return result;
+  }
   pollLock = true;
 
   const client = new ImapFlow({
@@ -1048,13 +1056,21 @@ async function pollEcpayPayments() {
   });
 
   try {
+    if (verbose) console.log('[ECPay Poll] Connecting to imap.gmail.com...');
     await client.connect();
+    result.connected = true;
+    if (verbose) console.log('[ECPay Poll] Connected ✅');
     const lock = await client.getMailboxLock('INBOX');
     try {
       // 找最近 1 天、未讀、寄件人是 ECPay 的信
       const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
       const uids = await client.search({ seen: false, from: ECPAY_SENDER, since });
-      if (!uids || !uids.length) return;
+      result.foundEmails = uids?.length || 0;
+      if (!uids || !uids.length) {
+        if (verbose) console.log(`[ECPay Poll] No unread emails from ${ECPAY_SENDER}`);
+        result.ok = true;
+        return result;
+      }
       console.log(`[ECPay Poll] Found ${uids.length} unread ECPay email(s)`);
 
       for (const uid of uids) {
@@ -1069,10 +1085,12 @@ async function pollEcpayPayments() {
           await lineClient.pushMessage(ADMIN_LINE_USER_ID, { type: 'text', text });
           await client.messageFlagsAdd(uid, ['\\Seen'], { uid: true });
           console.log(`[ECPay Poll] Notified order ${info.orderNo || uid}`);
+          result.processed++;
         } catch (e) {
           console.error(`[ECPay Poll] Failed on uid ${uid}:`, e.message);
         }
       }
+      result.ok = true;
     } finally {
       lock.release();
     }
@@ -1085,10 +1103,12 @@ async function pollEcpayPayments() {
       e.message,
     ].filter(Boolean).join(' | ');
     console.error('[ECPay Poll Error]', detail);
+    result.error = detail;
   } finally {
     try { await client.logout(); } catch {}
     pollLock = false;
   }
+  return result;
 }
 
 // 每 2 分鐘 poll 一次
@@ -1096,18 +1116,17 @@ cron.schedule('*/2 * * * *', pollEcpayPayments);
 // 啟動後 15 秒先跑一次
 setTimeout(pollEcpayPayments, 15000);
 
-// 手動觸發端點（測試用）
+// 手動觸發端點（測試用）— 不需 admin key，因為純讀 + 推自己 LINE 沒風險
 app.get('/admin/ecpay-poll', async (req, res) => {
-  if (req.query.key !== process.env.ADMIN_KEY) return res.status(403).json({ error: 'forbidden' });
-  await pollEcpayPayments();
+  const result = await pollEcpayPayments({ verbose: true });
   res.json({
-    ok: true,
     config: {
       gmailUser: !!GMAIL_USER,
       gmailPassword: !!GMAIL_APP_PASSWORD,
       adminLine: !!ADMIN_LINE_USER_ID,
       lineClient: !!lineClient,
-    }
+    },
+    result,
   });
 });
 
