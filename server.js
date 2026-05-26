@@ -768,9 +768,9 @@ async function sendReminders(type = 'day') {
   );
   // 下一場活動前請主辦人更新 server.js 頂部的 CURRENT_EVENT_DATE / MEET_URL / EVENT_LABEL / EVENT_TOPIC / EVENT_PREP
   const lineMsg = type === 'hour'
-    ? `⏰ 還有 30 分鐘！\n\nAI 共學聚今晚 20:00 即將開始 🚀\n📌 主題：${EVENT_TOPIC}\n\n💻 Meet 連結：\n${MEET_URL}\n\n🔔 19:50 開放進入教室\n20:00 準時開始（21:30 結束）\n\n📋 記得準備：\n${EVENT_PREP}\n\n等等見！🧬`
+    ? `⏰ 今晚就要開始囉！\n\nAI 共學聚今晚 20:00–21:30 線上見 🚀\n📌 主題：${EVENT_TOPIC}\n\n💻 Meet 連結：\n${MEET_URL}\n\n🔔 19:50 開放進入教室、20:00 準時開始\n\n📋 記得準備：\n${EVENT_PREP}\n\n晚點見！🧬`
     : `📅 明天提醒！\n\nAI 共學聚明天晚上 20:00–21:30\n📌 主題：${EVENT_TOPIC}\n\n💻 Meet 連結：\n${MEET_URL}\n\n期待明天和大家共學！🧬`;
-  const emailSubject = type === 'hour' ? '⏰ AI 共學聚 30 分鐘後開始！' : '📅 明天提醒：AI 共學聚';
+  const emailSubject = type === 'hour' ? '⏰ AI 共學聚今晚 20:00 開始！' : '📅 明天提醒：AI 共學聚';
 
   for (const reg of result.rows) {
     if (reg.line_user_id) {
@@ -793,10 +793,10 @@ async function sendReminders(type = 'day') {
   }
 }
 
-// 6/1 活動：前一天 5/31 20:00 day 提醒、當天 6/1 19:30 hour 提醒
+// 6/1 活動：前一天 5/31 20:00 day 提醒、當天 6/1 18:30 hour 提醒（提早 1 小時）
 // 兩個 cron 訊息會帶當前 MEET_URL，不再需要先 broadcast
 cron.schedule('0 20 31 5 *', () => sendReminders('day'),  { timezone: 'Asia/Taipei' });
-cron.schedule('30 19 1 6 *', () => sendReminders('hour'), { timezone: 'Asia/Taipei' });
+cron.schedule('30 18 1 6 *', () => sendReminders('hour'), { timezone: 'Asia/Taipei' });
 
 // ─── 綁定提醒 ────────────────────────────────────────────────────────────────
 // 寄一封一鍵綁定信給「報名了但 line_user_id 為空 + subscribe_line='yes' + 還沒寄過」的人。
