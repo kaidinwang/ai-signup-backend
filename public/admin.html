@@ -118,6 +118,7 @@
                         <th>場次</th>
                         <th>姓名</th>
                         <th>Email</th>
+                        <th>Email 寄送</th>
                         <th>出席</th>
                         <th>LINE</th>
                         <th>程度</th>
@@ -267,6 +268,7 @@ function renderTable() {
             <td><input type="text" list="eventSuggestions" value="${esc(r.event_date || '')}" onchange="updateEventDate(${r.id}, this.value)" placeholder="YYYY-MM-DD" class="bg-slate-800 border border-white/10 rounded px-2 py-1 text-xs text-slate-300 w-28"></td>
             <td class="font-medium">${esc(r.name)}</td>
             <td class="text-slate-400 text-xs">${esc(r.email)}</td>
+            <td class="text-xs whitespace-nowrap">${formatEmailStatus(r)}</td>
             <td>${attendBadge[r.attendance] || ''}</td>
             <td>
                 ${r.line_user_id ? '<span class="tag bg-green-500/20 text-green-300">✅ 已綁定</span>' : '<span class="tag bg-slate-700 text-slate-500">未綁定</span>'}
@@ -282,7 +284,17 @@ function renderTable() {
             <td class="text-xs text-slate-500 whitespace-nowrap">${formatDate(r.created_at)}</td>
             <td><button onclick="deleteReg(${r.id}, '${esc(r.name)}')" class="text-red-500 hover:text-red-400 text-xs px-2 py-1 rounded hover:bg-red-500/10 transition-all">刪除</button></td>
         </tr>
-    `).join('') || '<tr><td colspan="14" class="text-center text-slate-600 py-10">沒有符合的報名者</td></tr>';
+    `).join('') || '<tr><td colspan="15" class="text-center text-slate-600 py-10">沒有符合的報名者</td></tr>';
+}
+
+function formatEmailStatus(r) {
+    if (r.email_status === 'sent' && r.email_sent_at) {
+        return `<span class="tag bg-green-500/20 text-green-300" title="${esc(r.email_sent_at)}">✅ ${formatDate(r.email_sent_at)}</span>`;
+    }
+    if (r.email_status === 'failed') {
+        return `<span class="tag bg-red-500/20 text-red-300" title="${esc(r.email_error || '未知錯誤')}">❌ 失敗</span>`;
+    }
+    return '<span class="tag bg-slate-700 text-slate-500">⏳ 未寄</span>';
 }
 
 function filterTable() { renderTable(); }
@@ -329,10 +341,12 @@ async function sendReminder(type) {
 }
 
 function exportCSV() {
-    const headers = ['場次','姓名','Email','出席意願','實際出席','程度','職業','工具','興趣領域','報名來源','下一場意願','LINE綁定','已訂閱LINE@','報名時間'];
+    const headers = ['場次','姓名','Email','Email寄送狀態','Email寄送時間','Email錯誤','出席意願','實際出席','程度','職業','工具','興趣領域','報名來源','下一場意願','LINE綁定','已訂閱LINE@','報名時間'];
     const rows = filteredData.map(r => [
         r.event_date || '',
-        r.name, r.email, r.attendance,
+        r.name, r.email,
+        r.email_status || '未寄', r.email_sent_at || '', r.email_error || '',
+        r.attendance,
         r.attended ? '是' : '否',
         r.level, r.job_type, r.tools, r.interests, r.source,
         r.next_event_interested ? '是' : '否',

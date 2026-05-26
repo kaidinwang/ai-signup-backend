@@ -132,6 +132,9 @@ async function initDB() {
   await pool.query(`ALTER TABLE registrations ADD COLUMN IF NOT EXISTS attended BOOLEAN DEFAULT FALSE`);
   await pool.query(`ALTER TABLE registrations ADD COLUMN IF NOT EXISTS event_date TEXT`);
   await pool.query(`ALTER TABLE registrations ADD COLUMN IF NOT EXISTS bind_reminded_at TIMESTAMPTZ`);
+  await pool.query(`ALTER TABLE registrations ADD COLUMN IF NOT EXISTS email_sent_at TIMESTAMPTZ`);
+  await pool.query(`ALTER TABLE registrations ADD COLUMN IF NOT EXISTS email_status TEXT`);
+  await pool.query(`ALTER TABLE registrations ADD COLUMN IF NOT EXISTS email_error TEXT`);
   await pool.query(`ALTER TABLE line_bindings ADD COLUMN IF NOT EXISTS awaiting_attendance_email BOOLEAN DEFAULT FALSE`);
   // Backfill：既有資料（無 event_date）一律歸為 5/4 場次（共學聚首場）
   const backfilled = await pool.query(`UPDATE registrations SET event_date='2026-05-04' WHERE event_date IS NULL RETURNING id`);
@@ -306,7 +309,22 @@ app.post('/register', async (req, res) => {
       isGoing
         ? `嗨 ${name}！\n\n感謝你報名 AI 共學聚 🌱\n\n📅 ${EVENT_LABEL}\n📌 主題：${EVENT_TOPIC}\n\n💻 Meet 連結：\n${MEET_URL}\n🔔 19:50 開放進入教室、20:00 準時開始\n\n📲 完成 LINE 綁定可即時收 Meet 連結 + 活動前 30 分鐘 LINE 提醒：\n${buildBindUrl(email)}\n👆 點下去登入 LINE → 同意 → 加好友 → 自動完成，30 秒內搞定\n\n📋 上課前請準備：\n${EVENT_PREP}\n\n— AI 共學聚團隊 🧬`
         : `嗨 ${name}！\n\n感謝你填寫表單！本場主題「${EVENT_TOPIC}」於 ${EVENT_LABEL}，若之後想參加歡迎再回來填一次 📅\n\n— AI 共學聚團隊 🧬`
-    );
+    ).then(result => {
+      // 寄信結果寫回 DB 供 admin 後台查看（首次報名確認信專用，duplicate/cron 不覆蓋）
+      if (result?.ok) {
+        pool.query(
+          `UPDATE registrations SET email_sent_at=NOW(), email_status='sent', email_error=NULL
+           WHERE email=$1 AND event_date=$2`,
+          [email, CURRENT_EVENT_DATE]
+        ).catch(e => console.error('[Email UPDATE ok]', e.message));
+      } else {
+        pool.query(
+          `UPDATE registrations SET email_status='failed', email_error=$1
+           WHERE email=$2 AND event_date=$3`,
+          [(result?.error || 'unknown').slice(0, 500), email, CURRENT_EVENT_DATE]
+        ).catch(e => console.error('[Email UPDATE fail]', e.message));
+      }
+    });
 
     // 雙通道通知：不管有沒有綁 LINE，Email 一定帶 Meet 連結（上方）；若已綁 LINE，再加推一次 LINE
     if (isGoing && binding.rows[0]?.line_user_id) {
