@@ -1140,8 +1140,9 @@ const PORT = process.env.PORT || 3000;
 initDB().then(() => {
   app.listen(PORT, () => {
     console.log(`🚀 伺服器啟動 port ${PORT}`);
-    console.log(`   Email: ${process.env.EMAIL_USER || '未設定'}`);
-    console.log(`   LINE:  ${lineClient ? '已設定' : '未設定'}`);
+    console.log(`   Resend (寄信):     ${resend ? '✅ 已設定' : '❌ RESEND_API_KEY 未設定 — 所有信都會 silent skip'}`);
+    console.log(`   Email From:        ${EMAIL_FROM}`);
+    console.log(`   LINE Messaging:    ${lineClient ? '✅ 已設定' : '❌ LINE_CHANNEL_ACCESS_TOKEN 未設定'}`);
     console.log(`   LINE Login Channel ID: ${process.env.LINE_LOGIN_CHANNEL_ID || '❌ 未設定'}`);
     console.log(`   LINE Login Channel Secret: ${process.env.LINE_LOGIN_CHANNEL_SECRET ? '✅ 已設定' : '❌ 未設定'}`);
     const ecpayReady = GMAIL_USER && GMAIL_APP_PASSWORD && ADMIN_LINE_USER_ID && lineClient;
