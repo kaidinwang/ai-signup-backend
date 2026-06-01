@@ -126,6 +126,11 @@ async function initDB() {
       email         TEXT,
       created_at    TIMESTAMPTZ DEFAULT NOW()
     );
+    CREATE TABLE IF NOT EXISTS event_slides (
+      event_date    TEXT PRIMARY KEY,
+      slides_url    TEXT NOT NULL,
+      updated_at    TIMESTAMPTZ DEFAULT NOW()
+    );
   `);
   // Migration: 為既有表補上後台新增欄位
   await pool.query(`ALTER TABLE registrations ADD COLUMN IF NOT EXISTS next_event_interested BOOLEAN DEFAULT FALSE`);
@@ -468,7 +473,8 @@ app.post('/webhook', express.raw({ type: '*/*' }), lineMiddleware, async (req, r
       const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
       // 線上點名：「報到」keyword（限當前場次 CURRENT_EVENT_DATE）— 放在 alreadyBound 之前，bound 用戶也能觸發
-      if (/^(報到|簽到|\+1|我來了|我到了)$/i.test(text)) {
+      // 接受純 keyword 與帶日期前綴（例如「6/1報到」「2026-06-01簽到」）兩種寫法；日期前綴只當語意糖，實際以 CURRENT_EVENT_DATE 為準
+      if (/^(?:\d{1,2}[\/\-]\d{1,2}|\d{4}-\d{2}-\d{2})?\s*(報到|簽到|\+1|我來了|我到了)$/i.test(text)) {
         const bindRow = await pool.query(
           `SELECT email FROM line_bindings WHERE line_user_id=$1 AND email IS NOT NULL
            UNION
@@ -501,10 +507,12 @@ app.post('/webhook', express.raw({ type: '*/*' }), lineMiddleware, async (req, r
             );
           }
           await pool.query(`UPDATE line_bindings SET awaiting_attendance_email=FALSE WHERE line_user_id=$1`, [userId]);
-          await lineClient.replyMessage(event.replyToken, {
-            type: 'text',
-            text: `✅ 報到成功！\n\n${name} 你好！\n活動結束後簡報會寄到：\n📧 ${knownEmail}\n\n如果 Email 要改、直接傳新的 Email 給我`,
-          });
+          const slidesRow = await pool.query(`SELECT slides_url FROM event_slides WHERE event_date=$1`, [CURRENT_EVENT_DATE]);
+          const slidesUrl = slidesRow.rows[0]?.slides_url || null;
+          const replyText = slidesUrl
+            ? `✅ 報到成功！\n\n${name} 你好！\n\n📊 本場簡報下載：\n${slidesUrl}\n\n課程結束後也會寄一份到：\n📧 ${knownEmail}\n\n如果 Email 要改、直接傳新的 Email 給我`
+            : `✅ 報到成功！\n\n${name} 你好！\n活動結束後簡報會寄到：\n📧 ${knownEmail}\n\n如果 Email 要改、直接傳新的 Email 給我`;
+          await lineClient.replyMessage(event.replyToken, { type: 'text', text: replyText });
           continue;
         } else {
           await pool.query(
@@ -540,10 +548,12 @@ app.post('/webhook', express.raw({ type: '*/*' }), lineMiddleware, async (req, r
             `UPDATE line_bindings SET awaiting_attendance_email=FALSE, email=$2, display_name=COALESCE(display_name,$3) WHERE line_user_id=$1`,
             [userId, email, profile.displayName || null]
           );
-          await lineClient.replyMessage(event.replyToken, {
-            type: 'text',
-            text: `✅ 已記下！\n\n活動結束後簡報會寄到：\n📧 ${email}\n\n等等課程見 🚀`,
-          });
+          const slidesRow = await pool.query(`SELECT slides_url FROM event_slides WHERE event_date=$1`, [CURRENT_EVENT_DATE]);
+          const slidesUrl = slidesRow.rows[0]?.slides_url || null;
+          const replyText = slidesUrl
+            ? `✅ 已記下！\n\n📊 本場簡報下載：\n${slidesUrl}\n\n課程結束後也會寄一份到：\n📧 ${email}\n\n等等課程見 🚀`
+            : `✅ 已記下！\n\n活動結束後簡報會寄到：\n📧 ${email}\n\n等等課程見 🚀`;
+          await lineClient.replyMessage(event.replyToken, { type: 'text', text: replyText });
           continue;
         }
       }
@@ -707,6 +717,34 @@ app.post('/admin/api/send-survey-only', adminAuth, async (req, res) => {
     console.error('[Send Survey Only Error]', err.message);
     res.status(500).json({ error: err.message });
   }
+});
+
+// 場次簡報 URL 管理：報到回覆會自動帶上對應 event_date 的簡報連結
+// 用法：
+//   POST  /admin/api/event-slides?pw=...&event=2026-06-01&url=https://...   新增/更新
+//   GET   /admin/api/event-slides?pw=...                                    列表
+//   DELETE /admin/api/event-slides?pw=...&event=2026-06-01                   移除
+app.post('/admin/api/event-slides', adminAuth, async (req, res) => {
+  const eventDate = req.query.event || req.body?.event;
+  const slidesUrl = req.query.url || req.body?.url;
+  if (!eventDate || !slidesUrl) return res.status(400).json({ error: 'Missing event or url' });
+  await pool.query(`
+    INSERT INTO event_slides (event_date, slides_url, updated_at) VALUES ($1, $2, NOW())
+    ON CONFLICT (event_date) DO UPDATE SET slides_url=EXCLUDED.slides_url, updated_at=NOW()
+  `, [eventDate, slidesUrl]);
+  res.json({ success: true, eventDate, slidesUrl });
+});
+
+app.get('/admin/api/event-slides', adminAuth, async (req, res) => {
+  const result = await pool.query(`SELECT event_date, slides_url, updated_at FROM event_slides ORDER BY event_date DESC`);
+  res.json({ count: result.rows.length, slides: result.rows });
+});
+
+app.delete('/admin/api/event-slides', adminAuth, async (req, res) => {
+  const eventDate = req.query.event;
+  if (!eventDate) return res.status(400).json({ error: 'Missing event' });
+  const result = await pool.query(`DELETE FROM event_slides WHERE event_date=$1`, [eventDate]);
+  res.json({ success: true, eventDate, deleted: result.rowCount });
 });
 
 // 活動後寄簡報：對當前場次 attended=TRUE 的人批次寄信
