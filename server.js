@@ -558,8 +558,8 @@ app.post('/webhook', express.raw({ type: '*/*' }), lineMiddleware, async (req, r
           const slidesRow = await pool.query(`SELECT slides_url FROM event_slides WHERE event_date=$1`, [CURRENT_EVENT_DATE]);
           const slidesUrl = slidesRow.rows[0]?.slides_url || null;
           const replyText = slidesUrl
-            ? `✅ 已記下！\n\n📊 本場簡報下載：\n${slidesUrl}\n\n等等課程見 🚀`
-            : `✅ 已記下！\n\n活動結束後簡報會寄到：\n📧 ${email}\n\n等等課程見 🚀`;
+            ? `✅ 已記下！\n\n📊 本場簡報下載：\n${slidesUrl}`
+            : `✅ 已記下！\n\n活動結束後簡報會寄到：\n📧 ${email}`;
           await lineClient.replyMessage(event.replyToken, { type: 'text', text: replyText });
           continue;
         }
