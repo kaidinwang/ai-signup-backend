@@ -485,33 +485,37 @@ app.post('/webhook', express.raw({ type: '*/*' }), lineMiddleware, async (req, r
         const knownEmail = bindRow.rows[0]?.email || null;
 
         if (knownEmail) {
+          // 優先用 LINE 即時 displayName（最貼近用戶當下身份）；fallback DB.name；最後才空字串
+          let lineDisplayName = '';
+          try { lineDisplayName = (await lineClient.getProfile(userId))?.displayName || ''; } catch (_) {}
           const exist = await pool.query(
             `SELECT id, name FROM registrations WHERE line_user_id=$1 AND event_date=$2`,
             [userId, CURRENT_EVENT_DATE]
           );
-          let name;
+          const dbNameLookup = exist.rows[0]?.name
+            || (await pool.query(`SELECT name FROM registrations WHERE email=$1 ORDER BY created_at DESC LIMIT 1`, [knownEmail])).rows[0]?.name
+            || '';
+          // 顯示用名稱：LINE displayName 優先；其次 DB 裡非 fallback 的真名；都沒有就空（greet 句省略）
+          const greetName = lineDisplayName || (dbNameLookup && dbNameLookup !== '(LINE 來賓)' ? dbNameLookup : '');
+          // DB 儲存用名稱：保留 DB 既有真名；若只剩 fallback 就用 LINE displayName 補上
+          const dbName = (dbNameLookup && dbNameLookup !== '(LINE 來賓)') ? dbNameLookup : (lineDisplayName || '(LINE 來賓)');
           if (exist.rows[0]) {
             await pool.query(`UPDATE registrations SET attended=TRUE WHERE id=$1`, [exist.rows[0].id]);
-            name = exist.rows[0].name;
           } else {
-            const other = await pool.query(
-              `SELECT name FROM registrations WHERE email=$1 ORDER BY created_at DESC LIMIT 1`,
-              [knownEmail]
-            );
-            name = other.rows[0]?.name || '(LINE 來賓)';
             await pool.query(
               `INSERT INTO registrations (name, email, attendance, event_date, line_user_id, attended)
                VALUES ($1,$2,'Yes',$3,$4,TRUE)
                ON CONFLICT (email, event_date) DO UPDATE SET attended=TRUE, line_user_id=EXCLUDED.line_user_id`,
-              [name, knownEmail, CURRENT_EVENT_DATE, userId]
+              [dbName, knownEmail, CURRENT_EVENT_DATE, userId]
             );
           }
           await pool.query(`UPDATE line_bindings SET awaiting_attendance_email=FALSE WHERE line_user_id=$1`, [userId]);
           const slidesRow = await pool.query(`SELECT slides_url FROM event_slides WHERE event_date=$1`, [CURRENT_EVENT_DATE]);
           const slidesUrl = slidesRow.rows[0]?.slides_url || null;
+          const greetLine = greetName ? `${greetName} 你好！\n\n` : '';
           const replyText = slidesUrl
-            ? `✅ 報到成功！\n\n${name} 你好！\n\n📊 本場簡報下載：\n${slidesUrl}\n\n課程結束後也會寄一份到：\n📧 ${knownEmail}\n\n如果 Email 要改、直接傳新的 Email 給我`
-            : `✅ 報到成功！\n\n${name} 你好！\n活動結束後簡報會寄到：\n📧 ${knownEmail}\n\n如果 Email 要改、直接傳新的 Email 給我`;
+            ? `✅ 報到成功！\n\n${greetLine}📊 本場簡報下載：\n${slidesUrl}`
+            : `✅ 報到成功！\n\n${greetLine}活動結束後簡報會寄到：\n📧 ${knownEmail}`;
           await lineClient.replyMessage(event.replyToken, { type: 'text', text: replyText });
           continue;
         } else {
@@ -554,7 +558,7 @@ app.post('/webhook', express.raw({ type: '*/*' }), lineMiddleware, async (req, r
           const slidesRow = await pool.query(`SELECT slides_url FROM event_slides WHERE event_date=$1`, [CURRENT_EVENT_DATE]);
           const slidesUrl = slidesRow.rows[0]?.slides_url || null;
           const replyText = slidesUrl
-            ? `✅ 已記下！\n\n📊 本場簡報下載：\n${slidesUrl}\n\n課程結束後也會寄一份到：\n📧 ${email}\n\n等等課程見 🚀`
+            ? `✅ 已記下！\n\n📊 本場簡報下載：\n${slidesUrl}\n\n等等課程見 🚀`
             : `✅ 已記下！\n\n活動結束後簡報會寄到：\n📧 ${email}\n\n等等課程見 🚀`;
           await lineClient.replyMessage(event.replyToken, { type: 'text', text: replyText });
           continue;
