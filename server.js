@@ -515,15 +515,18 @@ app.post('/webhook', express.raw({ type: '*/*' }), lineMiddleware, async (req, r
           await lineClient.replyMessage(event.replyToken, { type: 'text', text: replyText });
           continue;
         } else {
+          // 沒 email 紀錄也直接給連結，UX 不卡。同時設 awaiting_attendance_email=TRUE，使用者若後續主動傳 email 仍能接住
           await pool.query(
             `INSERT INTO line_bindings (line_user_id, awaiting_attendance_email) VALUES ($1, TRUE)
              ON CONFLICT (line_user_id) DO UPDATE SET awaiting_attendance_email=TRUE`,
             [userId]
           );
-          await lineClient.replyMessage(event.replyToken, {
-            type: 'text',
-            text: `👋 找不到你的 Email 紀錄\n\n請傳你的 Email 給我（例如：yourname@gmail.com）\n活動結束後我會把簡報寄到那裡 📧`,
-          });
+          const slidesRow = await pool.query(`SELECT slides_url FROM event_slides WHERE event_date=$1`, [CURRENT_EVENT_DATE]);
+          const slidesUrl = slidesRow.rows[0]?.slides_url || null;
+          const replyText = slidesUrl
+            ? `✅ 報到成功！\n\n📊 本場簡報下載：\n${slidesUrl}\n\n想收課後問卷 / 下一場通知，\n歡迎傳你的 Email 給我 📧`
+            : `👋 找不到你的 Email 紀錄\n\n請傳你的 Email 給我（例如：yourname@gmail.com）\n活動結束後我會把簡報寄到那裡 📧`;
+          await lineClient.replyMessage(event.replyToken, { type: 'text', text: replyText });
           continue;
         }
       }
