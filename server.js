@@ -164,7 +164,82 @@ async function initDB() {
   `);
   if (fixed.rowCount > 0) console.log(`[DB] Normalized ${fixed.rowCount} email(s) to lowercase`);
   await pool.query(`UPDATE line_bindings SET email = LOWER(TRIM(email)) WHERE email <> LOWER(TRIM(email))`);
+
+  // ─── events：場次單一真相源（取代 server.js 頂部寫死的 CURRENT_EVENT_DATE/EVENT_* 常數 + 寫死的提醒 cron）
+  // 自動化鏈讀這張表：建場次 → 上架(published) → 提醒(day/hour) → 報到 → 課後問卷補推。
+  // 每場用 event_date（'YYYY-MM-DD' Asia/Taipei）當 key，與 registrations.event_date / event_slides.event_date 對齊。
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS events (
+      id                       SERIAL PRIMARY KEY,
+      event_date               TEXT NOT NULL UNIQUE,   -- 'YYYY-MM-DD'（Asia/Taipei），所有 join 的 key
+      title                    TEXT NOT NULL,          -- 短標題，例：AI 共學聚 6/1
+      topic                    TEXT NOT NULL,          -- 主題全文（文案用）
+      label                    TEXT,                   -- 人類可讀時段，例：6/1（一）20:00–21:30 線上
+      prep                     TEXT,                   -- 課前準備（文案用）
+      meet_url                 TEXT,                   -- Google Meet 連結
+      banner                   TEXT,                   -- banner 圖路徑，例：/banner-0601.png
+      start_at                 TIMESTAMPTZ NOT NULL,   -- 精確開始時間（提醒時間從這裡推算 + schema.org）
+      end_at                   TIMESTAMPTZ,            -- 結束時間（課後問卷時機從這裡推算）
+      registration_open_at     TIMESTAMPTZ,            -- 開放報名時間（上架）
+      survey_url               TEXT,                   -- 課後問卷連結
+      reminder_day_offset_min  INTEGER DEFAULT 1440,   -- day 提醒：開始前幾分鐘（預設 24h）
+      reminder_hour_offset_min INTEGER DEFAULT 90,     -- hour 提醒：開始前幾分鐘（預設 90 分）
+      survey_offset_min        INTEGER DEFAULT 720,    -- 課後問卷：結束後幾分鐘補推（預設 12h）
+      reminder_day_sent_at     TIMESTAMPTZ,            -- 冪等戳記：day 提醒已發
+      reminder_hour_sent_at    TIMESTAMPTZ,            -- 冪等戳記：hour 提醒已發
+      survey_sent_at           TIMESTAMPTZ,            -- 冪等戳記：課後問卷已自動補推
+      status                   TEXT DEFAULT 'draft',   -- draft | published | past | cancelled
+      created_at               TIMESTAMPTZ DEFAULT NOW()
+    );
+  `);
+  // Seed：把現有 3 場（5/4、5/18、6/1）灌入 events，已存在則略過（ON CONFLICT DO NOTHING）。
+  // 三場皆已結束，status='past'；自動化 cron 只動 future 的 published 場次，不會誤發。
+  await pool.query(`
+    INSERT INTO events (event_date, title, topic, label, banner, start_at, end_at, survey_url, status)
+    VALUES
+      ('2026-05-04', 'AI 共學聚 5/4',
+       '不懂 AI 也能學會！用 Gemini 讓工作快一倍',
+       '5/4（一）20:00–21:00 線上', '/banner-0504.png',
+       '2026-05-04T20:00:00+08:00', '2026-05-04T21:00:00+08:00', NULL, 'past'),
+      ('2026-05-18', 'AI 共學聚 5/18',
+       'Claude AI 入門實戰｜小白也能快速做出精美社群內容',
+       '5/18（一）20:00–21:30 線上', '/banner-0518.png',
+       '2026-05-18T20:00:00+08:00', '2026-05-18T21:30:00+08:00',
+       'https://forms.gle/VA4JDwSvbg13scB58', 'past'),
+      ('2026-06-01', 'AI 共學聚 6/1',
+       '不懂設計也能做！用 Gemini Canvas 快速打造 AI 簡報與旅遊小工具',
+       '6/1（一）20:00–21:30 線上', '/banner-0601.png',
+       '2026-06-01T20:00:00+08:00', '2026-06-01T21:30:00+08:00',
+       'https://forms.gle/VA4JDwSvbg13scB58', 'past')
+    ON CONFLICT (event_date) DO NOTHING
+  `);
+
   console.log('DB ready');
+}
+
+// ─── events 表存取層（單一真相源）────────────────────────────────────────────
+// 任何 ev row 的 null 欄位退回 server.js 頂部 env 常數，確保 events 表尚未填齊時行為不變（向後相容）。
+function mergeEventDefaults(ev) {
+  if (!ev) return null;
+  return {
+    ...ev,
+    topic:      ev.topic    || EVENT_TOPIC,
+    label:      ev.label    || EVENT_LABEL,
+    prep:       ev.prep     || EVENT_PREP,
+    meet_url:   ev.meet_url || MEET_URL,
+    survey_url: ev.survey_url || 'https://forms.gle/VA4JDwSvbg13scB58',
+  };
+}
+
+// 依日期取單一場次（含 env 預設合併）；查無時：當前場次退回 env 常數，其餘回 null。
+async function getEventByDate(date) {
+  try {
+    const r = await pool.query(`SELECT * FROM events WHERE event_date=$1`, [date]);
+    if (r.rows[0]) return mergeEventDefaults(r.rows[0]);
+  } catch (e) { console.error('[events] getEventByDate fail:', e.message); }
+  return date === CURRENT_EVENT_DATE
+    ? mergeEventDefaults({ event_date: CURRENT_EVENT_DATE })
+    : null;
 }
 
 // ─── LINE Client ─────────────────────────────────────────────────────────────
@@ -754,6 +829,69 @@ app.delete('/admin/api/event-slides', adminAuth, async (req, res) => {
   res.json({ success: true, eventDate, deleted: result.rowCount });
 });
 
+// ─── events 場次管理 API（自動化鏈的寫入入口：建場次 / 上架 / 列表 / 取消）────────────
+// 後台 HTML 管理頁（admin.html）後續再接；先提供 JSON API 讓場次可被建立並 publish，cron 才有東西可跑。
+// 用法：
+//   GET    /admin/api/events?pw=...                      列出所有場次
+//   POST   /admin/api/events?pw=...   body: {event_date,title,topic,start_at,...}   建立/更新（upsert by event_date）
+//   POST   /admin/api/events/publish?pw=...&event=YYYY-MM-DD   上架（status=published，自動化開始追這場）
+//   POST   /admin/api/events/cancel?pw=...&event=YYYY-MM-DD    取消（status=cancelled，停發後續提醒）
+app.get('/admin/api/events', adminAuth, async (req, res) => {
+  const result = await pool.query(`SELECT * FROM events ORDER BY event_date DESC`);
+  res.json({ count: result.rows.length, events: result.rows });
+});
+
+app.post('/admin/api/events', adminAuth, async (req, res) => {
+  const b = req.body || {};
+  const event_date = b.event_date || req.query.event;
+  if (!event_date || !b.title || !b.topic || !b.start_at) {
+    return res.status(400).json({ error: 'Missing required: event_date, title, topic, start_at' });
+  }
+  try {
+    const result = await pool.query(`
+      INSERT INTO events
+        (event_date, title, topic, label, prep, meet_url, banner, start_at, end_at,
+         registration_open_at, survey_url, reminder_day_offset_min, reminder_hour_offset_min,
+         survey_offset_min, status)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,
+              COALESCE($12,1440), COALESCE($13,90), COALESCE($14,720), COALESCE($15,'draft'))
+      ON CONFLICT (event_date) DO UPDATE SET
+        title=EXCLUDED.title, topic=EXCLUDED.topic, label=EXCLUDED.label, prep=EXCLUDED.prep,
+        meet_url=EXCLUDED.meet_url, banner=EXCLUDED.banner, start_at=EXCLUDED.start_at,
+        end_at=EXCLUDED.end_at, registration_open_at=EXCLUDED.registration_open_at,
+        survey_url=EXCLUDED.survey_url,
+        reminder_day_offset_min=EXCLUDED.reminder_day_offset_min,
+        reminder_hour_offset_min=EXCLUDED.reminder_hour_offset_min,
+        survey_offset_min=EXCLUDED.survey_offset_min,
+        status=EXCLUDED.status
+      RETURNING *
+    `, [event_date, b.title, b.topic, b.label || null, b.prep || null, b.meet_url || null,
+        b.banner || null, b.start_at, b.end_at || null, b.registration_open_at || null,
+        b.survey_url || null, b.reminder_day_offset_min, b.reminder_hour_offset_min,
+        b.survey_offset_min, b.status]);
+    res.json({ success: true, event: result.rows[0] });
+  } catch (err) {
+    console.error('[events upsert]', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/admin/api/events/publish', adminAuth, async (req, res) => {
+  const eventDate = req.query.event || req.body?.event;
+  if (!eventDate) return res.status(400).json({ error: 'Missing event' });
+  const r = await pool.query(`UPDATE events SET status='published' WHERE event_date=$1 RETURNING *`, [eventDate]);
+  if (!r.rowCount) return res.status(404).json({ error: 'Event not found' });
+  res.json({ success: true, event: r.rows[0] });
+});
+
+app.post('/admin/api/events/cancel', adminAuth, async (req, res) => {
+  const eventDate = req.query.event || req.body?.event;
+  if (!eventDate) return res.status(400).json({ error: 'Missing event' });
+  const r = await pool.query(`UPDATE events SET status='cancelled' WHERE event_date=$1 RETURNING *`, [eventDate]);
+  if (!r.rowCount) return res.status(404).json({ error: 'Event not found' });
+  res.json({ success: true, event: r.rows[0] });
+});
+
 // 活動後寄簡報：對當前場次 attended=TRUE 的人批次寄信
 // 用法：POST /admin/api/send-slides?pw=...&event=2026-05-18&url=<簡報URL>[&dry=1]
 app.post('/admin/api/send-slides', adminAuth, async (req, res) => {
@@ -823,16 +961,17 @@ app.get('/admin/api/binding-stats', adminAuth, async (req, res) => {
   });
 });
 
-async function sendReminders(type = 'day') {
-  // 只通知當前場次的報名者，避免誤發給之前場次已報名但這次沒報的人
+// 對「指定場次」的 Yes/Maybe 報名者發 day/hour 提醒。文案的 topic/meet/prep 全部讀 ev（null 退回 env 常數）。
+async function sendRemindersForEvent(ev, type = 'day') {
+  ev = mergeEventDefaults(ev);
+  // 只通知該場次的報名者，避免誤發給之前場次已報名但這次沒報的人
   const result = await pool.query(
     `SELECT * FROM registrations WHERE attendance IN ('Yes','Maybe') AND event_date=$1`,
-    [CURRENT_EVENT_DATE]
+    [ev.event_date]
   );
-  // 下一場活動前請主辦人更新 server.js 頂部的 CURRENT_EVENT_DATE / MEET_URL / EVENT_LABEL / EVENT_TOPIC / EVENT_PREP
   const lineMsg = type === 'hour'
-    ? `⏰ 今晚就要開始囉！\n\nAI 共學聚今晚 20:00–21:30 線上見 🚀\n📌 主題：${EVENT_TOPIC}\n\n💻 Meet 連結：\n${MEET_URL}\n\n🔔 19:50 開放進入教室、20:00 準時開始\n\n📋 記得準備：\n${EVENT_PREP}\n\n晚點見！🧬`
-    : `📅 明天提醒！\n\nAI 共學聚明天晚上 20:00–21:30\n📌 主題：${EVENT_TOPIC}\n\n💻 Meet 連結：\n${MEET_URL}\n\n期待明天和大家共學！🧬`;
+    ? `⏰ 今晚就要開始囉！\n\nAI 共學聚今晚 20:00–21:30 線上見 🚀\n📌 主題：${ev.topic}\n\n💻 Meet 連結：\n${ev.meet_url}\n\n🔔 19:50 開放進入教室、20:00 準時開始\n\n📋 記得準備：\n${ev.prep}\n\n晚點見！🧬`
+    : `📅 明天提醒！\n\nAI 共學聚明天晚上 20:00–21:30\n📌 主題：${ev.topic}\n\n💻 Meet 連結：\n${ev.meet_url}\n\n期待明天和大家共學！🧬`;
   const emailSubject = type === 'hour' ? '⏰ AI 共學聚今晚 20:00 開始！' : '📅 明天提醒：AI 共學聚';
 
   for (const reg of result.rows) {
@@ -854,12 +993,83 @@ async function sendReminders(type = 'day') {
     const greeting = binding.display_name ? `嗨 ${binding.display_name}！\n\n` : '嗨！\n\n';
     await sendLine(binding.line_user_id, `${greeting}${lineMsg}`);
   }
+  console.log(`[Reminder] event=${ev.event_date} type=${type} sent=${result.rows.length} reg + ${externalBindings.rows.length} external`);
 }
 
-// 6/1 活動：前一天 5/31 20:00 day 提醒、當天 6/1 18:30 hour 提醒（提早 1 小時）
-// 兩個 cron 訊息會帶當前 MEET_URL，不再需要先 broadcast
-cron.schedule('0 20 31 5 *', () => sendReminders('day'),  { timezone: 'Asia/Taipei' });
-cron.schedule('30 18 1 6 *', () => sendReminders('hour'), { timezone: 'Asia/Taipei' });
+// 向後相容包裝：舊 admin 端點 POST /admin/api/send-reminder 仍可用，預設打當前場次。
+async function sendReminders(type = 'day') {
+  const ev = await getEventByDate(CURRENT_EVENT_DATE);
+  return sendRemindersForEvent(ev, type);
+}
+
+// 課後問卷自動補推：寄給該場 Yes/Maybe 但「沒報到」的人（attended 為 TRUE 的人會走簡報+問卷信，不重複）。
+async function sendPostEventSurvey(ev) {
+  ev = mergeEventDefaults(ev);
+  const result = await pool.query(
+    `SELECT id, name, email FROM registrations
+     WHERE event_date=$1 AND attendance IN ('Yes','Maybe')
+       AND (attended=FALSE OR attended IS NULL)
+       AND email IS NOT NULL AND email <> ''
+     ORDER BY name ASC`,
+    [ev.event_date]
+  );
+  const subject = `📝 AI 共學聚 ${ev.event_date} 課後問卷 — 給我們 2 分鐘 🌱`;
+  for (const reg of result.rows) {
+    const text = `嗨 ${reg.name}！\n\n謝謝你報名這場 AI 共學聚 🌱\n📌 主題：${ev.topic}\n\n如果你有參與課程、想請你花 2 分鐘填一下回饋\n你的意見會幫助我們把下一場做得更好 💚\n\n📝 課後問卷：\n${ev.survey_url}\n\n更多場次與報名：\nhttps://event.cosmoseed.com.tw/courses\n\n— Din Din Wang 🧬\nAI 共學聚團隊`;
+    await sendEmail(reg.email, subject, text);
+  }
+  console.log(`[Survey] event=${ev.event_date} sent=${result.rows.length}`);
+  return result.rows.length;
+}
+
+// ─── 自動化心臟：每分鐘掃 events 表，到點就發 day/hour 提醒、課後問卷補推（取代寫死日期的 cron）──
+// 冪等：每個動作發完蓋戳記（reminder_day_sent_at / reminder_hour_sent_at / survey_sent_at），不重發。
+async function runEventAutomation() {
+  try {
+    const now = Date.now();
+    // 撈近期相關場次：未過期太久（含結束後問卷視窗）的 published 場次
+    const { rows } = await pool.query(
+      `SELECT * FROM events
+       WHERE status = 'published'
+         AND start_at > NOW() - INTERVAL '3 days'`
+    );
+    for (const ev of rows) {
+      const start = new Date(ev.start_at).getTime();
+      const dayAt  = start - (ev.reminder_day_offset_min  ?? 1440) * 60000;
+      const hourAt = start - (ev.reminder_hour_offset_min ?? 90)   * 60000;
+      const dayDue  = !ev.reminder_day_sent_at  && now >= dayAt  && now < start;
+      const hourDue = !ev.reminder_hour_sent_at && now >= hourAt && now < start;
+
+      // 同分鐘兩封都到點（通常是「遲上架」：publish 時已過 day 提醒時間）→ 只發較緊急的 hour，
+      // day 直接蓋戳記但不寄，避免同一個人在同一分鐘收到兩封幾乎一樣的提醒。
+      if (dayDue && hourDue) {
+        await sendRemindersForEvent(ev, 'hour');
+        await pool.query(
+          `UPDATE events SET reminder_hour_sent_at = NOW(), reminder_day_sent_at = NOW() WHERE id = $1`,
+          [ev.id]
+        );
+        console.log(`[EventAutomation] ${ev.event_date} 遲上架：day+hour 同分鐘到點，只發 hour、day 標記略過`);
+      } else if (dayDue) {
+        await sendRemindersForEvent(ev, 'day');
+        await pool.query(`UPDATE events SET reminder_day_sent_at = NOW() WHERE id = $1`, [ev.id]);
+      } else if (hourDue) {
+        await sendRemindersForEvent(ev, 'hour');
+        await pool.query(`UPDATE events SET reminder_hour_sent_at = NOW() WHERE id = $1`, [ev.id]);
+      }
+      // 課後問卷補推：結束後 survey_offset_min 分鐘，且有設 survey_url
+      if (ev.end_at && !ev.survey_sent_at) {
+        const surveyAt = new Date(ev.end_at).getTime() + (ev.survey_offset_min ?? 720) * 60000;
+        if (now >= surveyAt && (ev.survey_url)) {
+          await sendPostEventSurvey(ev);
+          await pool.query(`UPDATE events SET survey_sent_at = NOW() WHERE id = $1`, [ev.id]);
+        }
+      }
+    }
+  } catch (e) {
+    console.error('[EventAutomation] error:', e.message);
+  }
+}
+cron.schedule('* * * * *', runEventAutomation, { timezone: 'Asia/Taipei' });
 
 // ─── 綁定提醒 ────────────────────────────────────────────────────────────────
 // 寄一封一鍵綁定信給「報名了但 line_user_id 為空 + subscribe_line='yes' + 還沒寄過」的人。
