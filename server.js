@@ -45,17 +45,17 @@ function httpsGet(url, token) {
 const CURRENT_EVENT_DATE = process.env.CURRENT_EVENT_DATE || '2026-06-15';
 const MEET_URL = process.env.MEET_URL || 'https://meet.google.com/oph-rqjx-vgx';
 // 當前場次顯示文字（人類可讀），用於 LINE/Email 文案
-const EVENT_LABEL = process.env.EVENT_LABEL || '6/15（一）20:00–21:30 線上';
+const EVENT_LABEL = process.env.EVENT_LABEL || '6/15（一）20:00–21:00 線上';
 const EVENT_TOPIC = process.env.EVENT_TOPIC || '一人公司獲利實戰！用 ChatGPT 快速打造你的內容系統';
 const EVENT_PREP = process.env.EVENT_PREP || '1. 筆電（建議可登入 Google 帳號）\n2. ChatGPT 帳號（沒有可先到 chatgpt.com 註冊）';
 
-// 活動「進行中時段」：19:30–21:30 Asia/Taipei，這段時間內的報名 → 確認信/LINE 立即帶 Meet URL
+// 活動「進行中時段」：19:30–21:00 Asia/Taipei，這段時間內的報名 → 確認信/LINE 立即帶 Meet URL
 function isEventLive(now = new Date()) {
   const tz = 'Asia/Taipei';
   const today = now.toLocaleDateString('en-CA', { timeZone: tz });
   if (today !== CURRENT_EVENT_DATE) return false;
   const hhmm = now.toLocaleTimeString('en-GB', { timeZone: tz, hour12: false, hour: '2-digit', minute: '2-digit' });
-  return hhmm >= '19:30' && hhmm <= '21:30';
+  return hhmm >= '19:30' && hhmm <= '21:00';
 }
 
 const app = express();
@@ -214,8 +214,8 @@ async function initDB() {
        'https://forms.gle/VA4JDwSvbg13scB58', 'past'),
       ('2026-06-15', 'AI 共學聚 6/15',
        '一人公司獲利實戰！用 ChatGPT 快速打造你的內容系統',
-       '6/15（一）20:00–21:30 線上', '/banner-0615.png',
-       '2026-06-15T20:00:00+08:00', '2026-06-15T21:30:00+08:00',
+       '6/15（一）20:00–21:00 線上', '/banner-0615.png',
+       '2026-06-15T20:00:00+08:00', '2026-06-15T21:00:00+08:00',
        'https://forms.gle/VA4JDwSvbg13scB58', 'published')
     ON CONFLICT (event_date) DO NOTHING
   `);
@@ -976,8 +976,8 @@ async function sendRemindersForEvent(ev, type = 'day') {
     [ev.event_date]
   );
   const lineMsg = type === 'hour'
-    ? `⏰ 今晚就要開始囉！\n\nAI 共學聚今晚 20:00–21:30 線上見 🚀\n📌 主題：${ev.topic}\n\n💻 Meet 連結：\n${ev.meet_url}\n\n🔔 19:50 開放進入教室、20:00 準時開始\n\n📋 記得準備：\n${ev.prep}\n\n晚點見！🧬`
-    : `📅 明天提醒！\n\nAI 共學聚明天晚上 20:00–21:30\n📌 主題：${ev.topic}\n\n💻 Meet 連結：\n${ev.meet_url}\n\n期待明天和大家共學！🧬`;
+    ? `⏰ 今晚就要開始囉！\n\nAI 共學聚今晚 20:00–21:00 線上見 🚀\n📌 主題：${ev.topic}\n\n💻 Meet 連結：\n${ev.meet_url}\n\n🔔 19:50 開放進入教室、20:00 準時開始\n\n📋 記得準備：\n${ev.prep}\n\n晚點見！🧬`
+    : `📅 明天提醒！\n\nAI 共學聚明天晚上 20:00–21:00\n📌 主題：${ev.topic}\n\n💻 Meet 連結：\n${ev.meet_url}\n\n期待明天和大家共學！🧬`;
   const emailSubject = type === 'hour' ? '⏰ AI 共學聚今晚 20:00 開始！' : '📅 明天提醒：AI 共學聚';
 
   for (const reg of result.rows) {
