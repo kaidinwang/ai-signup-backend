@@ -42,11 +42,11 @@ function httpsGet(url, token) {
 }
 
 // 當前場次日期（ISO 格式 YYYY-MM-DD）。Render 設 CURRENT_EVENT_DATE env var 來切換場次。
-const CURRENT_EVENT_DATE = process.env.CURRENT_EVENT_DATE || '2026-06-15';
+const CURRENT_EVENT_DATE = process.env.CURRENT_EVENT_DATE || '2026-06-22';
 const MEET_URL = process.env.MEET_URL || 'https://meet.google.com/oph-rqjx-vgx';
 // 當前場次顯示文字（人類可讀），用於 LINE/Email 文案
-const EVENT_LABEL = process.env.EVENT_LABEL || '6/15（一）20:00–21:00 線上';
-const EVENT_TOPIC = process.env.EVENT_TOPIC || '一人公司獲利實戰！用 ChatGPT 快速打造你的內容系統';
+const EVENT_LABEL = process.env.EVENT_LABEL || '6/22（一）20:00–21:00 線上';
+const EVENT_TOPIC = process.env.EVENT_TOPIC || '一人公司品牌內容實戰！用 ChatGPT 快速打造你的內容系統';
 const EVENT_PREP = process.env.EVENT_PREP || '1. 筆電（建議可登入 Google 帳號）\n2. ChatGPT 帳號（沒有可先到 chatgpt.com 註冊）';
 
 // 活動「進行中時段」：19:30–21:00 Asia/Taipei，這段時間內的報名 → 確認信/LINE 立即帶 Meet URL
@@ -193,8 +193,8 @@ async function initDB() {
     );
   `);
   // Seed：把場次灌入 events，已存在則略過（ON CONFLICT DO NOTHING）。
-  // 5/4、5/18、6/1 皆已結束，status='past'；6/15 為當前場次 status='published'，
-  // 自動化 cron 只動 future 的 published 場次（6/14 20:00 day 提醒、6/15 18:30 hour 提醒、6/16 課後問卷）。
+  // 5/4、5/18、6/1 皆已結束，status='past'；6/22 為當前場次 status='published'，
+  // 自動化 cron 只動 future 的 published 場次（6/21 20:00 day 提醒、6/22 18:30 hour 提醒、6/23 課後問卷）。
   await pool.query(`
     INSERT INTO events (event_date, title, topic, label, banner, start_at, end_at, survey_url, status)
     VALUES
@@ -212,10 +212,10 @@ async function initDB() {
        '6/1（一）20:00–21:30 線上', '/banner-0601.png',
        '2026-06-01T20:00:00+08:00', '2026-06-01T21:30:00+08:00',
        'https://forms.gle/VA4JDwSvbg13scB58', 'past'),
-      ('2026-06-15', 'AI 共學聚 6/15',
-       '一人公司獲利實戰！用 ChatGPT 快速打造你的內容系統',
-       '6/15（一）20:00–21:00 線上', '/banner-0615.png',
-       '2026-06-15T20:00:00+08:00', '2026-06-15T21:00:00+08:00',
+      ('2026-06-22', 'AI 共學聚 6/22',
+       '一人公司品牌內容實戰！用 ChatGPT 快速打造你的內容系統',
+       '6/22（一）20:00–21:00 線上', '/banner-0622.png',
+       '2026-06-22T20:00:00+08:00', '2026-06-22T21:00:00+08:00',
        'https://forms.gle/VA4JDwSvbg13scB58', 'published')
     ON CONFLICT (event_date) DO NOTHING
   `);
