@@ -1195,6 +1195,33 @@ app.get('/admin/api/send-meet-emergency', adminAuth, async (req, res) => {
   }
 });
 
+// 一次性：場次改期通知 — 對指定場次報名者寄「6/15 順延至 6/22 + 邀請加入官方 LINE 取得上課訊息」Email
+// 用法：GET /admin/api/send-event-change-notice?pw=...&event=2026-06-22[&dry=1]
+app.get('/admin/api/send-event-change-notice', adminAuth, async (req, res) => {
+  try {
+    const eventDate = req.query.event || CURRENT_EVENT_DATE;
+    const dryRun = req.query.dry === '1';
+    const result = await pool.query(
+      `SELECT id, name, email FROM registrations
+       WHERE event_date=$1 AND email IS NOT NULL AND email <> ''
+       ORDER BY created_at ASC`,
+      [eventDate]
+    );
+    const subject = '【AI 共學聚】場次調整通知：原 6/15 順延至 6/22（時間不變）';
+    const sent = [];
+    for (const r of result.rows) {
+      const text = `嗨 ${r.name}！\n\n感謝你報名 AI 共學聚 🌱 跟你說一個小調整：\n原訂 6/15（一）的場次因故順延一週，新日期是——\n\n📅 ${EVENT_LABEL}（時間不變）\n📌 主題：${EVENT_TOPIC}\n💻 Meet 連結：\n${MEET_URL}\n🔔 19:50 開放進入教室、20:00 準時開始\n\n你的報名我們已自動保留到新場次，不用重新報名 ✅\n\n────\n\n📲 上課提醒與當天 Meet 連結都會透過官方 LINE 發送，請務必加入並完成綁定（30 秒）：\n${buildBindUrl(r.email)}\n👆 點下去登入 LINE → 同意 → 加好友 → 自動完成\n\n📋 上課前請準備：\n${EVENT_PREP}\n\n造成不便很抱歉，6/22 線上見！🧬\n— Din Din Wang｜AI 共學聚團隊`;
+      if (!dryRun) await sendEmail(r.email, subject, text);
+      sent.push({ id: r.id, name: r.name, email: r.email });
+    }
+    console.log(`[EventChangeNotice] ${dryRun ? '(dry-run) ' : ''}event=${eventDate} sent=${sent.length}`);
+    res.json({ success: true, dryRun, eventDate, count: sent.length, recipients: sent });
+  } catch (err) {
+    console.error('[Event Change Notice Error]', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // 寄邀請信給「曾報名過舊場次但本場未報名 + 不在 line_bindings（避免重複）」的人
 // 用法：GET /admin/api/send-invite-past-registrants?pw=...&event=2026-05-18[&dry=1]
 app.get('/admin/api/send-invite-past-registrants', adminAuth, async (req, res) => {
