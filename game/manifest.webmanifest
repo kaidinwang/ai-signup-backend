@@ -1,0 +1,19 @@
+{
+  "name": "殭屍種蘿蔔大作戰",
+  "short_name": "種蘿蔔大作戰",
+  "description": "種蔬菜擋下可愛動物殭屍的離線塔防遊戲",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "fullscreen",
+  "orientation": "any",
+  "background_color": "#12180f",
+  "theme_color": "#3a7d2c",
+  "icons": [
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

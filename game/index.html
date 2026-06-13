@@ -1,0 +1,682 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#3a7d2c">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="manifest" href="manifest.webmanifest">
+<title>殭屍種蘿蔔大作戰 🥕🧟</title>
+<style>
+  :root{
+    --green:#3a7d2c; --green2:#52a534; --dirt:#8a6a44; --dirt2:#7a5d3a;
+    --gold:#ffcf3f; --sun:#ffd34d; --panel:#1f2a1c; --card:#2e3d28;
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+  html,body{margin:0; padding:0; height:100%; overflow:hidden;
+    font-family:-apple-system,"PingFang TC","Microsoft JhengHei",system-ui,sans-serif;
+    background:#12180f; color:#fff; user-select:none; -webkit-user-select:none; touch-action:manipulation;}
+  #app{position:fixed; inset:0; display:flex; flex-direction:column;}
+
+  /* ---------- 通用畫面 ---------- */
+  .screen{position:absolute; inset:0; display:none; flex-direction:column; align-items:center;
+    justify-content:center; padding:20px; text-align:center; gap:14px;
+    background:radial-gradient(circle at 50% 20%, #2c4a22, #14200e 70%);}
+  .screen.active{display:flex;}
+  h1{font-size:30px; margin:0; text-shadow:2px 3px 0 #1c2a14; line-height:1.25;}
+  .sub{opacity:.85; font-size:15px; max-width:340px; line-height:1.5;}
+  .btn{appearance:none; border:none; border-radius:16px; padding:16px 26px; font-size:19px;
+    font-weight:800; color:#1c2a14; background:linear-gradient(#ffe07a,var(--gold));
+    box-shadow:0 5px 0 #b8902a, 0 8px 14px rgba(0,0,0,.4); cursor:pointer; min-width:200px;}
+  .btn:active{transform:translateY(3px); box-shadow:0 2px 0 #b8902a;}
+  .btn.sec{background:linear-gradient(#7fd05f,#52a534); color:#0e1a08; box-shadow:0 5px 0 #2c6a1a;}
+  .btn.sec:active{box-shadow:0 2px 0 #2c6a1a;}
+  .btn.small{min-width:auto; padding:10px 16px; font-size:15px;}
+  .row{display:flex; gap:12px; flex-wrap:wrap; justify-content:center;}
+
+  /* ---------- 關卡 / 商店清單 ---------- */
+  .grid-list{display:grid; grid-template-columns:repeat(auto-fill,minmax(140px,1fr));
+    gap:12px; width:100%; max-width:520px; overflow-y:auto; max-height:62vh; padding:4px;}
+  .tile{background:var(--card); border:2px solid #44582f; border-radius:16px; padding:14px 10px;
+    display:flex; flex-direction:column; align-items:center; gap:6px; cursor:pointer;}
+  .tile.locked{opacity:.5; filter:grayscale(.7);}
+  .tile .big{font-size:34px;}
+  .tile .nm{font-weight:800; font-size:15px;}
+  .tile .meta{font-size:12px; opacity:.85;}
+  .tile .price{font-weight:800; color:var(--gold); font-size:14px;}
+  .stars{color:var(--gold); font-size:13px; letter-spacing:1px;}
+
+  /* ---------- 戰鬥畫面 ---------- */
+  #battle{display:none; flex-direction:column; height:100%; background:#101a0c;}
+  #battle.active{display:flex;}
+  #topbar{display:flex; align-items:center; gap:8px; padding:8px 10px;
+    background:var(--panel); border-bottom:2px solid #2c3a22; flex-wrap:wrap;}
+  .stat{display:flex; align-items:center; gap:4px; font-weight:800; font-size:16px;
+    background:#11180d; border-radius:12px; padding:6px 10px;}
+  .stat .ic{font-size:18px;}
+  #lvlname{font-size:13px; opacity:.85; margin-left:auto;}
+  #cards{display:flex; gap:7px; padding:8px 10px; overflow-x:auto; background:#16210f;
+    border-bottom:2px solid #2c3a22; -webkit-overflow-scrolling:touch;}
+  .card{flex:0 0 auto; width:64px; background:var(--card); border:2px solid #4a5e32;
+    border-radius:12px; padding:6px 2px; text-align:center; cursor:pointer; position:relative; overflow:hidden;}
+  .card .emj{font-size:26px; line-height:1;}
+  .card .nm{font-size:10px; margin-top:2px; white-space:nowrap;}
+  .card .cost{font-size:11px; font-weight:800; color:var(--sun);}
+  .card.sel{border-color:var(--gold); box-shadow:0 0 0 2px var(--gold) inset;}
+  .card.disabled{opacity:.45;}
+  .card .cd{position:absolute; inset:0; background:rgba(0,0,0,.6); transform-origin:bottom;}
+  #stage{flex:1; display:flex; align-items:center; justify-content:center; position:relative; min-height:0;}
+  canvas{max-width:100%; max-height:100%; touch-action:none; display:block;}
+  #tools{position:absolute; right:10px; bottom:10px; display:flex; gap:8px;}
+  .tool{width:48px; height:48px; border-radius:12px; background:var(--card); border:2px solid #4a5e32;
+    font-size:22px; display:flex; align-items:center; justify-content:center; cursor:pointer;}
+  .tool.sel{border-color:#ff6b6b; box-shadow:0 0 0 2px #ff6b6b inset;}
+
+  /* ---------- 結算彈窗 ---------- */
+  #overlay{position:absolute; inset:0; display:none; align-items:center; justify-content:center;
+    background:rgba(0,0,0,.65); z-index:30;}
+  #overlay.show{display:flex;}
+  .modal{background:#21301a; border:3px solid var(--gold); border-radius:22px; padding:24px;
+    text-align:center; max-width:330px; display:flex; flex-direction:column; gap:14px;}
+  .modal h2{margin:0; font-size:26px;}
+  .toast{position:absolute; top:54px; left:50%; transform:translateX(-50%); background:#000a;
+    padding:8px 16px; border-radius:20px; font-weight:700; font-size:14px; opacity:0;
+    transition:opacity .25s; z-index:40; pointer-events:none;}
+  .toast.show{opacity:1;}
+  .hint{font-size:12px; opacity:.7;}
+  .tag{display:inline-block; background:#0006; border-radius:8px; padding:2px 8px; font-size:12px; margin:2px;}
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- 主選單 -->
+  <section id="menu" class="screen active">
+    <div style="font-size:64px">🧟🥕</div>
+    <h1>殭屍種蘿蔔<br>大作戰</h1>
+    <p class="sub">種下蔬菜，擋下一波波可愛的動物殭屍大軍！過關解鎖新角色，用金幣到商店買更多蔬菜。<br><b>完全離線，不用網路 📴</b></p>
+    <div class="row">
+      <button class="btn" onclick="Game.openLevels()">▶️ 開始遊戲</button>
+    </div>
+    <div class="row">
+      <button class="btn sec small" onclick="Game.openShop()">🛒 商店</button>
+      <button class="btn sec small" onclick="Game.openHowto()">❓ 怎麼玩</button>
+      <button class="btn sec small" onclick="Game.resetSave()">🗑️ 重置進度</button>
+    </div>
+    <div class="hint" id="menuCoins"></div>
+  </section>
+
+  <!-- 怎麼玩 -->
+  <section id="howto" class="screen">
+    <h1>怎麼玩 ❓</h1>
+    <p class="sub" style="max-width:380px; text-align:left">
+      1️⃣ 上方卡片是你的蔬菜，點一下選取（要有足夠 ☀️ 陽光）。<br><br>
+      2️⃣ 點田地空格就會種下蔬菜。<br><br>
+      3️⃣ 🌻 向日葵會自動產生陽光；🥕🫛 等蔬菜會自動攻擊同一列的殭屍。<br><br>
+      4️⃣ 🌶️ 辣椒彈會炸掉整列殭屍；🥔 馬鈴薯盾很硬，用來擋路。<br><br>
+      5️⃣ 別讓殭屍走到最左邊的家！清掉所有殭屍就過關。<br><br>
+      6️⃣ 過關拿 🪙 金幣，到商店買新蔬菜，破關解鎖新角色！
+    </p>
+    <button class="btn" onclick="Game.go('menu')">了解！</button>
+  </section>
+
+  <!-- 選關 -->
+  <section id="levels" class="screen">
+    <h1>選擇關卡 🗺️</h1>
+    <div id="levelList" class="grid-list"></div>
+    <button class="btn sec small" onclick="Game.go('menu')">⬅️ 返回</button>
+  </section>
+
+  <!-- 商店 -->
+  <section id="shop" class="screen">
+    <h1>蔬菜商店 🛒</h1>
+    <div class="stat"><span class="ic">🪙</span><span id="shopCoins">0</span></div>
+    <div id="shopList" class="grid-list"></div>
+    <button class="btn sec small" onclick="Game.go('menu')">⬅️ 返回</button>
+  </section>
+
+  <!-- 戰鬥 -->
+  <section id="battle">
+    <div id="topbar">
+      <div class="stat"><span class="ic">☀️</span><span id="sunVal">0</span></div>
+      <div class="stat"><span class="ic">🪙</span><span id="coinVal">0</span></div>
+      <div class="stat"><span class="ic">🧟</span><span id="zVal">0</span></div>
+      <div id="lvlname">關卡</div>
+      <button class="btn sec small" style="min-width:auto;padding:6px 12px" onclick="Game.quitBattle()">⏏️</button>
+    </div>
+    <div id="cards"></div>
+    <div id="stage">
+      <canvas id="cv" width="900" height="500"></canvas>
+      <div id="tools">
+        <div class="tool" id="shovel" onclick="Game.toggleShovel()">🪏</div>
+      </div>
+    </div>
+    <div id="overlay">
+      <div class="modal">
+        <h2 id="ovTitle">勝利！</h2>
+        <div id="ovBody"></div>
+        <div class="row" id="ovBtns"></div>
+      </div>
+    </div>
+    <div id="toast" class="toast"></div>
+  </section>
+
+</div>
+
+<script>
+/* =========================================================================
+   殭屍種蘿蔔大作戰  —  單檔離線 HTML5 遊戲
+   玩法：種蔬菜防守，擋下動物殭屍。植物大戰殭屍式塔防。
+   ========================================================================= */
+(function(){
+"use strict";
+
+/* ---------------- 資料定義：蔬菜（你的角色 / 防守單位） ---------------- */
+// type: producer 產陽光 | shooter 射手 | wall 盾牆 | bomb 範圍炸彈
+const PLANTS = {
+  sunflower:{ name:"向日葵", emj:"🌻", cost:50,  hp:60,  type:"producer", produce:25, rate:5.5, recharge:5, color:"#ffd34d", price:0,   desc:"自動產生陽光的關鍵蔬菜" },
+  radish:   { name:"蘿蔔",   emj:"🥕", cost:100, hp:80,  type:"shooter",  dmg:20, rate:1.5, speed:430, recharge:5, color:"#ff7a3d", price:0, desc:"本作主角！穩定發射蘿蔔" },
+  potato:   { name:"馬鈴薯盾", emj:"🥔", cost:50, hp:340, type:"wall", recharge:14, color:"#caa46a", price:0, desc:"血很厚，拿來擋路最好用" },
+  pea:      { name:"豌豆連發", emj:"🫛", cost:175, hp:80,  type:"shooter", dmg:18, rate:0.7, speed:480, recharge:7, color:"#7fd05f", price:120, desc:"攻速超快的連發射手" },
+  chili:    { name:"辣椒彈",   emj:"🌶️", cost:150, hp:1,   type:"bomb", dmg:1800, recharge:18, color:"#ff4d4d", price:150, desc:"一次炸光整一列的殭屍" },
+  corn:     { name:"玉米炮",   emj:"🌽", cost:300, hp:120, type:"shooter", dmg:55, rate:2.2, speed:380, recharge:9, splash:50, color:"#ffd84d", price:260, desc:"重砲！傷害高還有濺射" },
+  cabbage:  { name:"高麗菜投手", emj:"🥬", cost:200, hp:90, type:"shooter", dmg:34, rate:1.7, speed:360, recharge:7, color:"#9be36a", price:300, desc:"拋出高麗菜，傷害不錯" },
+  broccoli: { name:"花椰菜王",  emj:"🥦", cost:350, hp:160, type:"shooter", dmg:42, rate:0.9, speed:500, recharge:11, color:"#3fae5a", price:420, desc:"終極射手，又快又痛" },
+};
+// 預設就解鎖的蔬菜
+const DEFAULT_PLANTS = ["sunflower","radish","potato"];
+
+/* ---------------- 資料定義：殭屍（可愛動物，敵人） ---------------- */
+const ZTYPES = {
+  bunny:{ name:"殭屍兔", emj:"🐰", hp:90,  speed:22, dmg:18, coin:2, tint:"#9be36a" },
+  dog:  { name:"殭屍狗", emj:"🐶", hp:150, speed:20, dmg:22, coin:3, tint:"#7fae5a" },
+  cat:  { name:"殭屍貓", emj:"🐱", hp:130, speed:26, dmg:20, coin:3, tint:"#8fd06a" },
+  pig:  { name:"鐵盔豬", emj:"🐷", hp:340, speed:16, dmg:30, coin:6, tint:"#6a9a4a", armor:true },
+  frog: { name:"跳跳蛙", emj:"🐸", hp:110, speed:40, dmg:18, coin:4, tint:"#6ad06a" },
+  bear: { name:"殭屍熊王", emj:"🐻", hp:1200, speed:12, dmg:60, coin:40, tint:"#4a7a3a", boss:true, scale:1.5 },
+};
+
+/* ---------------- 關卡設計 ---------------- */
+// waves: 每個 wave 是一組同時/接續出現的殭屍。spawner 會依序送出。
+function L(name, icon, reward, unlock, waves, flag){
+  return {name, icon, reward, unlock, waves, flag};
+}
+const LEVELS = [
+  L("第 1 關 · 後院","🏡", 60, null, [
+    {t:3,type:"bunny"},{t:9,type:"bunny"},{t:16,type:"dog"},
+    {t:24,type:"bunny"},{t:26,type:"dog"},{t:36,type:"cat"},
+    {t:40,type:"dog"},{t:42,type:"bunny"},{t:44,type:"cat"},
+  ]),
+  L("第 2 關 · 菜園","🌿", 80, "pea", [
+    {t:3,type:"dog"},{t:8,type:"cat"},{t:13,type:"bunny"},{t:14,type:"dog"},
+    {t:22,type:"cat"},{t:24,type:"dog"},{t:30,type:"frog"},
+    {t:36,type:"dog"},{t:38,type:"cat"},{t:40,type:"frog"},{t:44,type:"dog"},{t:46,type:"cat"},
+  ]),
+  L("第 3 關 · 鐵盔來襲","⚙️", 110, "chili", [
+    {t:3,type:"cat"},{t:7,type:"dog"},{t:12,type:"pig"},
+    {t:20,type:"dog"},{t:22,type:"frog"},{t:26,type:"pig"},
+    {t:34,type:"cat"},{t:36,type:"pig"},{t:40,type:"dog"},{t:42,type:"frog"},
+    {t:48,type:"pig"},{t:50,type:"dog"},{t:52,type:"cat"},{t:54,type:"pig"},
+  ]),
+  L("第 4 關 · 大軍壓境","🔥", 150, "corn", [
+    {t:2,type:"dog"},{t:4,type:"cat"},{t:8,type:"frog"},{t:10,type:"pig"},
+    {t:16,type:"dog"},{t:18,type:"frog"},{t:20,type:"cat"},{t:24,type:"pig"},{t:26,type:"pig"},
+    {t:34,type:"frog"},{t:36,type:"dog"},{t:38,type:"cat"},{t:40,type:"pig"},{t:42,type:"frog"},
+    {t:50,type:"pig"},{t:52,type:"pig"},{t:54,type:"dog"},{t:56,type:"cat"},{t:58,type:"frog"},{t:60,type:"pig"},
+  ]),
+  L("第 5 關 · 殭屍熊王","👑", 220, "broccoli", [
+    {t:3,type:"dog"},{t:6,type:"cat"},{t:10,type:"pig"},{t:14,type:"frog"},
+    {t:22,type:"pig"},{t:24,type:"dog"},{t:28,type:"frog"},{t:30,type:"cat"},
+    {t:40,type:"pig"},{t:42,type:"pig"},{t:44,type:"frog"},
+    {t:54,type:"bear"},
+    {t:58,type:"dog"},{t:60,type:"cat"},{t:62,type:"pig"},{t:64,type:"frog"},{t:66,type:"dog"},
+  ], "boss"),
+];
+
+/* ---------------- 存檔 ---------------- */
+const SAVE_KEY = "zombie_radish_save_v1";
+const DEF_SAVE = { coins:0, maxLevel:0, unlocked:DEFAULT_PLANTS.slice(), stars:{} };
+let save = load();
+function load(){
+  try{ const s = JSON.parse(localStorage.getItem(SAVE_KEY)); if(s&&s.unlocked) return Object.assign({}, DEF_SAVE, s); }catch(e){}
+  return JSON.parse(JSON.stringify(DEF_SAVE));
+}
+function persist(){ try{ localStorage.setItem(SAVE_KEY, JSON.stringify(save)); }catch(e){} }
+
+/* ---------------- 棋盤設定 ---------------- */
+const ROWS=5, COLS=9;
+const cv = document.getElementById("cv");
+const ctx = cv.getContext("2d");
+const HOUSE_W = 56;                 // 左側「家」的安全區寬
+const fieldX = HOUSE_W;
+const cellW = (cv.width - HOUSE_W) / COLS;
+const cellH = cv.height / ROWS;
+function cellCX(c){ return fieldX + c*cellW + cellW/2; }
+function cellCY(r){ return r*cellH + cellH/2; }
+
+/* ---------------- 戰鬥狀態 ---------------- */
+let B = null;       // 當前戰鬥狀態物件
+let raf = null, lastT = 0;
+
+function newBattle(levelIdx){
+  const lvl = LEVELS[levelIdx];
+  B = {
+    levelIdx, lvl,
+    sun: 150, coins: save.coins,
+    plants: [],          // {id,key,c,r,hp,maxHp,t,def}
+    zombies: [],         // {id,type,def,x,r,hp,maxHp,eating,t,scale}
+    shots: [],           // {x,y,r,dmg,color,vx,splash}
+    fx: [],              // {x,y,t,life,txt,color,vy}
+    selected: null,      // 選取的蔬菜 key
+    shovel: false,
+    cd: {},              // 各蔬菜冷卻剩餘秒
+    spawnIdx: 0,
+    elapsed: 0,
+    passiveT: 0,
+    killed: 0,
+    ended: false,
+    uid: 1,
+  };
+  buildCards();
+  updateHUD();
+}
+
+/* ---------------- 卡片列 ---------------- */
+function buildCards(){
+  const wrap = document.getElementById("cards");
+  wrap.innerHTML = "";
+  save.unlocked.forEach(key=>{
+    const p = PLANTS[key]; if(!p) return;
+    const el = document.createElement("div");
+    el.className = "card"; el.dataset.key = key;
+    el.innerHTML = `<div class="emj">${p.emj}</div><div class="nm">${p.name}</div>`+
+                   `<div class="cost">☀️${p.cost}</div><div class="cd" style="transform:scaleY(0)"></div>`;
+    el.onclick = ()=>selectPlant(key);
+    wrap.appendChild(el);
+  });
+}
+function selectPlant(key){
+  if(B.ended) return;
+  if((B.cd[key]||0) > 0) { toast("還在冷卻中…"); return; }
+  if(B.sun < PLANTS[key].cost){ toast("陽光不足 ☀️"); return; }
+  B.shovel = false; document.getElementById("shovel").classList.remove("sel");
+  B.selected = (B.selected===key)? null : key;
+  refreshCardSel();
+}
+function refreshCardSel(){
+  document.querySelectorAll("#cards .card").forEach(el=>{
+    const key = el.dataset.key, p = PLANTS[key];
+    el.classList.toggle("sel", B.selected===key);
+    const disabled = B.sun < p.cost || (B.cd[key]||0) > 0;
+    el.classList.toggle("disabled", disabled);
+    const cdEl = el.querySelector(".cd");
+    const frac = (B.cd[key]||0) / (p.recharge||1);
+    cdEl.style.transform = "scaleY("+Math.max(0,Math.min(1,frac))+")";
+  });
+}
+
+/* ---------------- 點擊棋盤 ---------------- */
+cv.addEventListener("pointerdown", e=>{
+  if(!B || B.ended) return;
+  const rect = cv.getBoundingClientRect();
+  const x = (e.clientX-rect.left) * (cv.width/rect.width);
+  const y = (e.clientY-rect.top) * (cv.height/rect.height);
+  if(x < fieldX) return;
+  const c = Math.floor((x-fieldX)/cellW), r = Math.floor(y/cellH);
+  if(c<0||c>=COLS||r<0||r>=ROWS) return;
+  const existing = B.plants.find(p=>p.c===c && p.r===r);
+
+  if(B.shovel){
+    if(existing){ B.plants = B.plants.filter(p=>p!==existing); spawnFx(cellCX(c),cellCY(r),"🪏",.5,"#fff"); }
+    return;
+  }
+  if(!B.selected) return;
+  const key = B.selected, def = PLANTS[key];
+  if(existing){ toast("這格已經有蔬菜了"); return; }
+  if(B.sun < def.cost){ toast("陽光不足 ☀️"); return; }
+
+  if(def.type === "bomb"){
+    // 炸彈：直接炸掉整列（同一 row）
+    B.sun -= def.cost;
+    detonateRow(r, def.dmg);
+    spawnFx(cellCX(c),cellCY(r),"💥",.6,"#ff7a3d");
+  } else {
+    B.sun -= def.cost;
+    B.plants.push({ id:B.uid++, key, c, r, hp:def.hp, maxHp:def.hp, t:0, def });
+    spawnFx(cellCX(c),cellCY(r),def.emj,.4,def.color);
+  }
+  B.cd[key] = def.recharge||4;
+  B.selected = null;
+  updateHUD(); refreshCardSel();
+});
+
+function detonateRow(r, dmg){
+  B.zombies.forEach(z=>{ if(z.r===r){ z.hp -= dmg; } });
+  for(let i=0;i<6;i++) spawnFx(fieldX+Math.random()*(cv.width-fieldX), cellCY(r)+(Math.random()*40-20), "🔥",.6,"#ff4d4d");
+}
+
+/* ---------------- 主迴圈 ---------------- */
+function loop(ts){
+  if(!B){ return; }
+  const dt = Math.min(0.05, (ts-lastT)/1000 || 0); lastT = ts;
+  if(!B.ended) update(dt);
+  draw();
+  raf = requestAnimationFrame(loop);
+}
+
+function update(dt){
+  B.elapsed += dt;
+
+  // 冷卻倒數
+  for(const k in B.cd){ if(B.cd[k]>0) B.cd[k] = Math.max(0, B.cd[k]-dt); }
+
+  // 被動陽光（少量），讓開局不卡死
+  B.passiveT += dt;
+  if(B.passiveT >= 10){ B.passiveT = 0; B.sun += 25; }
+
+  // 生成殭屍（依關卡腳本）
+  const waves = B.lvl.waves;
+  while(B.spawnIdx < waves.length && B.elapsed >= waves[B.spawnIdx].t){
+    spawnZombie(waves[B.spawnIdx].type);
+    B.spawnIdx++;
+  }
+
+  // 蔬菜行為
+  for(const p of B.plants){
+    p.t += dt;
+    const d = p.def;
+    if(d.type === "producer"){
+      if(p.t >= d.rate){ p.t = 0; B.sun += d.produce; spawnFx(cellCX(p.c),cellCY(p.r)-10,"☀️",.7,"#ffd34d"); }
+    } else if(d.type === "shooter"){
+      // 該列右側有殭屍才開火
+      const target = B.zombies.some(z=>z.r===p.r && z.x > cellCX(p.c)-cellW*0.3);
+      if(target && p.t >= d.rate){
+        p.t = 0;
+        B.shots.push({ x:cellCX(p.c)+cellW*0.3, y:cellCY(p.r)-6, r:p.r, dmg:d.dmg,
+          color:d.color, vx:d.speed, splash:d.splash||0 });
+      }
+    }
+  }
+
+  // 子彈
+  for(const s of B.shots){
+    s.x += s.vx*dt;
+    // 命中該列最左、在子彈前方的殭屍
+    let hit=null, hx=Infinity;
+    for(const z of B.zombies){
+      if(z.r!==s.r) continue;
+      if(z.x >= s.x-18 && z.x < s.x+22 && z.x < hx){ hit=z; hx=z.x; }
+    }
+    if(hit){
+      hit.hp -= s.dmg; s.dead=true;
+      spawnFx(hit.x, cellCY(hit.r)-14, "", .25, s.color, true);
+      if(s.splash){ B.zombies.forEach(z=>{ if(z.r===s.r && Math.abs(z.x-hit.x)<cellW*0.7 && z!==hit) z.hp-=s.splash; }); }
+    }
+    if(s.x > cv.width+30) s.dead=true;
+  }
+  B.shots = B.shots.filter(s=>!s.dead);
+
+  // 殭屍移動 / 啃食
+  for(const z of B.zombies){
+    z.t += dt;
+    // 找同列、在殭屍左邊、最靠近的蔬菜來啃
+    let target=null, tx=-Infinity;
+    for(const p of B.plants){
+      if(p.r!==z.r) continue;
+      const px = cellCX(p.c);
+      if(px <= z.x+8 && px > tx){ target=p; tx=px; }
+    }
+    if(target && z.x - cellCX(target.c) < cellW*0.55){
+      z.eating = true;
+      target.hp -= z.def.dmg * dt;
+      if(target.hp <= 0){ B.plants = B.plants.filter(p=>p!==target); z.eating=false; }
+    } else {
+      z.eating = false;
+      z.x -= z.def.speed * dt;
+    }
+    if(z.hp <= 0){
+      z.dead = true; B.killed++;
+      B.coins += z.def.coin; B.sun += 2;
+      spawnFx(z.x, cellCY(z.r), "🪙+"+z.def.coin, .9, "#ffd34d");
+    }
+    if(z.x < fieldX - 6){ // 攻入家門
+      B.ended = true; endBattle(false);
+    }
+  }
+  B.zombies = B.zombies.filter(z=>!z.dead);
+
+  // 特效壽命
+  for(const f of B.fx){ f.t += dt; f.y += (f.vy||0)*dt; }
+  B.fx = B.fx.filter(f=>f.t < f.life);
+
+  // 勝利判定：腳本送完 + 場上無殭屍
+  if(!B.ended && B.spawnIdx >= waves.length && B.zombies.length===0 && B.elapsed>2){
+    B.ended = true; endBattle(true);
+  }
+
+  updateHUD(); refreshCardSel();
+}
+
+function spawnZombie(type){
+  const def = ZTYPES[type];
+  const r = Math.floor(Math.random()*ROWS);
+  B.zombies.push({ id:B.uid++, type, def, x:cv.width+20+Math.random()*40, r,
+    hp:def.hp, maxHp:def.hp, eating:false, t:0, scale:def.scale||1 });
+}
+function spawnFx(x,y,txt,life,color,ring){
+  B.fx.push({x,y,txt,life,t:0,color,vy: ring?0:-26, ring});
+}
+
+/* ---------------- 繪圖 ---------------- */
+function draw(){
+  // 田地
+  for(let r=0;r<ROWS;r++){
+    ctx.fillStyle = (r%2===0)? "#7a5d3a" : "#6c5130";
+    ctx.fillRect(fieldX, r*cellH, cv.width-fieldX, cellH);
+  }
+  // 家（左側）
+  ctx.fillStyle = "#3a5a8a"; ctx.fillRect(0,0,fieldX,cv.height);
+  ctx.font = "30px serif"; ctx.textAlign="center"; ctx.textBaseline="middle";
+  for(let r=0;r<ROWS;r++) ctx.fillText("🏠", fieldX/2, cellCY(r));
+  // 格線
+  ctx.strokeStyle = "rgba(0,0,0,.18)"; ctx.lineWidth=2;
+  for(let c=0;c<=COLS;c++){ ctx.beginPath(); ctx.moveTo(fieldX+c*cellW,0); ctx.lineTo(fieldX+c*cellW,cv.height); ctx.stroke(); }
+  for(let r=0;r<=ROWS;r++){ ctx.beginPath(); ctx.moveTo(fieldX,r*cellH); ctx.lineTo(cv.width,r*cellH); ctx.stroke(); }
+
+  // 種植高亮
+  if(B && B.selected && !B.shovel){
+    ctx.fillStyle = "rgba(255,255,255,.07)";
+    ctx.fillRect(fieldX,0,cv.width-fieldX,cv.height);
+  }
+
+  if(!B) return;
+
+  // 蔬菜
+  for(const p of B.plants){
+    const x=cellCX(p.c), y=cellCY(p.r);
+    ctx.font = Math.floor(cellH*0.62)+"px serif";
+    ctx.fillText(p.def.emj, x, y+2);
+    drawHpBar(x, y-cellH*0.36, cellW*0.6, p.hp/p.maxHp, "#5fd05f");
+  }
+  // 子彈
+  for(const s of B.shots){
+    ctx.fillStyle = s.color; ctx.beginPath();
+    ctx.arc(s.x, s.y, 8, 0, Math.PI*2); ctx.fill();
+    ctx.strokeStyle="rgba(0,0,0,.25)"; ctx.lineWidth=2; ctx.stroke();
+  }
+  // 殭屍
+  for(const z of B.zombies){
+    const y=cellCY(z.r); const sz = Math.floor(cellH*0.6*z.scale);
+    // 殭屍綠光
+    ctx.fillStyle = z.def.tint+"55";
+    ctx.beginPath(); ctx.arc(z.x, y, sz*0.5, 0, Math.PI*2); ctx.fill();
+    ctx.font = sz+"px serif";
+    ctx.fillText(z.def.emj, z.x, y+2);
+    if(z.def.armor){ ctx.font=Math.floor(sz*0.5)+"px serif"; ctx.fillText("⛑️", z.x, y-sz*0.4); }
+    if(z.def.boss){ ctx.font=Math.floor(sz*0.5)+"px serif"; ctx.fillText("👑", z.x, y-sz*0.45); }
+    drawHpBar(z.x, y-sz*0.62, sz*0.9, z.hp/z.maxHp, "#ff5b5b");
+  }
+  // 特效
+  for(const f of B.fx){
+    const a = 1 - f.t/f.life;
+    if(f.ring){
+      ctx.strokeStyle = f.color; ctx.globalAlpha=a; ctx.lineWidth=3;
+      ctx.beginPath(); ctx.arc(f.x,f.y, 6+ (1-a)*22, 0, Math.PI*2); ctx.stroke(); ctx.globalAlpha=1;
+    } else {
+      ctx.globalAlpha=a; ctx.fillStyle=f.color||"#fff";
+      ctx.font="bold "+Math.floor(cellH*0.3)+"px serif";
+      ctx.fillText(f.txt, f.x, f.y); ctx.globalAlpha=1;
+    }
+  }
+}
+function drawHpBar(cx, y, w, frac, color){
+  frac = Math.max(0,Math.min(1,frac));
+  const h=6;
+  ctx.fillStyle="rgba(0,0,0,.45)"; ctx.fillRect(cx-w/2, y, w, h);
+  ctx.fillStyle=color; ctx.fillRect(cx-w/2, y, w*frac, h);
+}
+
+/* ---------------- HUD / 結算 ---------------- */
+function updateHUD(){
+  if(!B) return;
+  document.getElementById("sunVal").textContent = Math.floor(B.sun);
+  document.getElementById("coinVal").textContent = B.coins;
+  const remain = (B.lvl.waves.length - B.spawnIdx) + B.zombies.length;
+  document.getElementById("zVal").textContent = remain;
+  document.getElementById("lvlname").textContent = B.lvl.name;
+}
+function endBattle(win){
+  cancelAnimationFrame(raf); raf=null;
+  const ov = document.getElementById("overlay");
+  const title = document.getElementById("ovTitle");
+  const body = document.getElementById("ovBody");
+  const btns = document.getElementById("ovBtns");
+  btns.innerHTML = "";
+  if(win){
+    const lvl = B.lvl, idx = B.levelIdx;
+    const battleEarned = B.coins - save.coins;   // 戰鬥中打殭屍賺到的金幣
+    save.coins = B.coins + lvl.reward;            // 場上金幣 + 過關獎勵
+    if(idx+1 > save.maxLevel) save.maxLevel = idx+1;
+    save.stars[idx] = Math.max(save.stars[idx]||0, 3);
+    let unlockMsg = "";
+    if(lvl.unlock && save.unlocked.indexOf(lvl.unlock)<0){
+      save.unlocked.push(lvl.unlock);
+      unlockMsg = `<div class="tag">🎉 解鎖新蔬菜：${PLANTS[lvl.unlock].emj} ${PLANTS[lvl.unlock].name}</div>`;
+    }
+    persist();
+    title.textContent = "🎉 過關！";
+    body.innerHTML = `<div style="font-size:40px">${lvl.icon}</div>`+
+      `<div>過關獎勵 🪙 <b>${lvl.reward}</b> ＋ 戰鬥 🪙 <b>${battleEarned}</b></div>`+
+      `<div class="hint">目前金幣：🪙 ${save.coins}</div>`+
+      `<div class="stars">★★★</div>${unlockMsg}`;
+    if(idx+1 < LEVELS.length){
+      const b = mkBtn("➡️ 下一關","btn",()=>{ closeOverlay(); startLevel(idx+1); });
+      btns.appendChild(b);
+    }
+    btns.appendChild(mkBtn("🗺️ 選關","btn sec",()=>{ closeOverlay(); Game.openLevels(); hideBattle(); }));
+  } else {
+    save.coins = B.coins; persist();
+    title.textContent = "💀 殭屍攻進來了！";
+    body.innerHTML = `<div style="font-size:40px">🧟🏠</div><div>別灰心，再試一次！</div>`+
+      `<div class="hint">小提示：多種 🌻 向日葵衝陽光，🥔 馬鈴薯盾擋路。</div>`;
+    btns.appendChild(mkBtn("🔄 重玩","btn",()=>{ closeOverlay(); startLevel(B.levelIdx); }));
+    btns.appendChild(mkBtn("🗺️ 選關","btn sec",()=>{ closeOverlay(); Game.openLevels(); hideBattle(); }));
+  }
+  ov.classList.add("show");
+}
+function mkBtn(txt, cls, fn){ const b=document.createElement("button"); b.className=cls+" small"; b.textContent=txt; b.onclick=fn; return b; }
+function closeOverlay(){ document.getElementById("overlay").classList.remove("show"); }
+
+let toastT=null;
+function toast(msg){
+  const t=document.getElementById("toast"); t.textContent=msg; t.classList.add("show");
+  clearTimeout(toastT); toastT=setTimeout(()=>t.classList.remove("show"),1200);
+}
+
+/* ---------------- 畫面切換 ---------------- */
+function startLevel(idx){
+  showBattle();
+  newBattle(idx);
+  lastT = performance.now();
+  cancelAnimationFrame(raf);
+  raf = requestAnimationFrame(loop);
+}
+function showBattle(){ document.querySelectorAll(".screen").forEach(s=>s.classList.remove("active")); document.getElementById("battle").classList.add("active"); }
+function hideBattle(){ document.getElementById("battle").classList.remove("active"); }
+
+/* ---------------- 公開 API ---------------- */
+const Game = {
+  go(id){
+    cancelAnimationFrame(raf); raf=null; B=null; hideBattle();
+    document.querySelectorAll(".screen").forEach(s=>s.classList.remove("active"));
+    document.getElementById(id).classList.add("active");
+    if(id==="menu") document.getElementById("menuCoins").textContent = "🪙 金幣：" + save.coins + "　|　已解鎖 "+save.unlocked.length+" 種蔬菜";
+  },
+  openHowto(){ this.go("howto"); },
+  openLevels(){
+    this.go("levels");
+    const list = document.getElementById("levelList"); list.innerHTML="";
+    LEVELS.forEach((lvl,i)=>{
+      const unlocked = i <= save.maxLevel;
+      const cleared = (save.stars[i]||0) > 0;
+      const el = document.createElement("div");
+      el.className = "tile" + (unlocked?"":" locked");
+      el.innerHTML = `<div class="big">${lvl.icon}</div><div class="nm">${lvl.name}</div>`+
+        `<div class="stars">${cleared?"★★★":"☆☆☆"}</div>`+
+        `<div class="meta">${unlocked? (lvl.flag==="boss"?"👑 魔王關":"獎勵 🪙"+lvl.reward) : "🔒 尚未解鎖"}</div>`;
+      if(unlocked) el.onclick = ()=>startLevel(i);
+      list.appendChild(el);
+    });
+  },
+  openShop(){
+    this.go("shop");
+    document.getElementById("shopCoins").textContent = save.coins;
+    const list = document.getElementById("shopList"); list.innerHTML="";
+    Object.keys(PLANTS).forEach(key=>{
+      const p = PLANTS[key];
+      const owned = save.unlocked.indexOf(key)>=0;
+      const el = document.createElement("div"); el.className="tile";
+      el.innerHTML = `<div class="big">${p.emj}</div><div class="nm">${p.name}</div>`+
+        `<div class="meta">${p.desc}</div>`+
+        (owned? `<div class="price" style="color:#7fd05f">✅ 已擁有</div>`
+              : `<div class="price">🪙 ${p.price}</div>`);
+      if(!owned){
+        el.onclick = ()=>{
+          if(save.coins >= p.price){
+            save.coins -= p.price; save.unlocked.push(key); persist();
+            toast("解鎖 "+p.name+"！"); this.openShop();
+          } else { toast("金幣不足 🪙"); }
+        };
+      }
+      list.appendChild(el);
+    });
+  },
+  toggleShovel(){
+    if(!B) return;
+    B.shovel = !B.shovel; B.selected=null; refreshCardSel();
+    document.getElementById("shovel").classList.toggle("sel", B.shovel);
+  },
+  quitBattle(){
+    if(B && !B.ended){ save.coins = Math.max(save.coins, B.coins); persist(); }
+    this.openLevels();
+  },
+  resetSave(){
+    if(confirm("確定要清除所有進度（金幣、解鎖、過關）嗎？")){
+      save = JSON.parse(JSON.stringify(DEF_SAVE)); persist(); this.go("menu"); toast("已重置");
+    }
+  },
+};
+window.Game = Game;
+
+// 初始化選單文字
+Game.go("menu");
+
+// 註冊 service worker（讓手機可離線安裝；用 file:// 開啟時自動略過）
+if("serviceWorker" in navigator && location.protocol.startsWith("http")){
+  navigator.serviceWorker.register("sw.js").catch(()=>{});
+}
+})();
+</script>
+</body>
+</html>
