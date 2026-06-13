@@ -1,0 +1,41 @@
+name: Deploy game to GitHub Pages
+
+# 把 game/ 資料夾自動發佈成 GitHub Pages 網站
+on:
+  push:
+    branches: ["claude/zombie-radish-game-qwttbo"]
+    paths: ["game/**", ".github/workflows/deploy-game.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Pages（自動啟用 Pages）
+        uses: actions/configure-pages@v5
+        with:
+          enablement: true
+
+      - name: Upload game folder as site
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: ./game
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
