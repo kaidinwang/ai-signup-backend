@@ -6,6 +6,7 @@ const { Resend } = require('resend');
 const line = require('@line/bot-sdk');
 const cron = require('node-cron');
 const path = require('path');
+const fs = require('fs');
 const https = require('https');
 
 // Node 18 以下沒有 global fetch，用 https 模組替代
@@ -53,7 +54,7 @@ const EVENT_PREP = process.env.EVENT_PREP || '1. 筆電（建議可登入 Google
 function isEventLive(now = new Date()) {
   const tz = 'Asia/Taipei';
   const today = now.toLocaleDateString('en-CA', { timeZone: tz });
-  if (today !== CURRENT_EVENT_DATE) return false;
+  if (today !== currentEventSync().event_date) return false;
   const hhmm = now.toLocaleTimeString('en-GB', { timeZone: tz, hour12: false, hour: '2-digit', minute: '2-digit' });
   return hhmm >= '19:30' && hhmm <= '21:00';
 }
@@ -94,6 +95,22 @@ app.get('/register', (req, res) => res.sendFile(path.join(__dirname, 'public', '
 
 app.use(express.static(path.join(__dirname, 'public'), { extensions: ['html'] }));
 
+// 後台上傳的場次 banner 從 DB 取（Render 磁碟是 ephemeral，重新部署會清空，所以 bytes 存 DB 才持久）。
+// 上傳寫入 event_assets；committed 的 /banner-XXXX.png 仍走上面的 express.static。
+app.get('/assets/:filename', async (req, res) => {
+  try {
+    const fn = req.params.filename;
+    const r = await pool.query(`SELECT mime, bytes FROM event_assets WHERE filename=$1`, [fn]);
+    if (!r.rows[0]) return res.status(404).send('Not found');
+    res.set('Content-Type', r.rows[0].mime);
+    res.set('Cache-Control', 'public, max-age=3600');
+    res.send(r.rows[0].bytes);
+  } catch (e) {
+    console.error('[assets]', e.message);
+    res.status(500).send('error');
+  }
+});
+
 // ─── Database (PostgreSQL) ───────────────────────────────────────────────────
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
@@ -129,6 +146,12 @@ async function initDB() {
     CREATE TABLE IF NOT EXISTS event_slides (
       event_date    TEXT PRIMARY KEY,
       slides_url    TEXT NOT NULL,
+      updated_at    TIMESTAMPTZ DEFAULT NOW()
+    );
+    CREATE TABLE IF NOT EXISTS event_assets (
+      filename      TEXT PRIMARY KEY,        -- 例：banner-0706.png
+      mime          TEXT NOT NULL,
+      bytes         BYTEA NOT NULL,
       updated_at    TIMESTAMPTZ DEFAULT NOW()
     );
   `);
@@ -248,6 +271,55 @@ async function getEventByDate(date) {
     : null;
 }
 
+// ─── 對外「當前場次」解析（events 表為 runtime 單一真相源）─────────────────────
+// 規則：status='published' 中，今天/最近未來優先（升冪取最近的那場），沒有未來場才退回最近的過去場。
+// → 後台「上架」下一場後，當前場過了會自動接棒，不必再改 Render 環境變數。
+// 表空 / 查詢失敗 → 退回 server.js 頂部 env 常數組成的虛擬場次（向後相容，行為不變）。
+let _currentEventCache = null;
+let _currentEventCachedAt = 0;
+
+function taipeiToday() {
+  return new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Taipei' });
+}
+
+async function resolveCurrentEvent() {
+  try {
+    const today = taipeiToday();
+    const r = await pool.query(
+      `SELECT * FROM events
+       WHERE status = 'published'
+       ORDER BY
+         CASE WHEN event_date >= $1 THEN 0 ELSE 1 END,           -- 今天/未來優先
+         CASE WHEN event_date >= $1 THEN event_date END ASC NULLS LAST,  -- 未來場取最近
+         event_date DESC                                          -- 沒未來場則取最近的過去場
+       LIMIT 1`,
+      [today]
+    );
+    if (r.rows[0]) return mergeEventDefaults(r.rows[0]);
+  } catch (e) { console.error('[events] resolveCurrentEvent fail:', e.message); }
+  return mergeEventDefaults({
+    event_date: CURRENT_EVENT_DATE,
+    start_at: `${CURRENT_EVENT_DATE}T20:00:00+08:00`,
+  });
+}
+
+// 取當前場次（60 秒快取，避免 /check-email 之類高頻路徑每次打 DB）。
+async function getCurrentEvent() {
+  const now = Date.now();
+  if (_currentEventCache && now - _currentEventCachedAt < 60000) return _currentEventCache;
+  _currentEventCache = await resolveCurrentEvent();
+  _currentEventCachedAt = now;
+  return _currentEventCache;
+}
+
+// 場次異動（上架/取消/建立）後呼叫，讓下一次 getCurrentEvent 立即重算。
+function invalidateCurrentEvent() { _currentEventCachedAt = 0; }
+
+// 同步存取點（給少數同步函式如 isEventLive 用）：回最後一次解析結果，未解析過退 env。
+function currentEventSync() {
+  return _currentEventCache || mergeEventDefaults({ event_date: CURRENT_EVENT_DATE });
+}
+
 // ─── LINE Client ─────────────────────────────────────────────────────────────
 const lineConfig = {
   channelAccessToken: process.env.LINE_CHANNEL_ACCESS_TOKEN || '',
@@ -300,11 +372,12 @@ function buildBindUrl(email) {
   return `${base}/line-login?email=${encodeURIComponent(email)}`;
 }
 
-function buildBindReminderEmail(name, email) {
+function buildBindReminderEmail(name, email, ev) {
+  ev = mergeEventDefaults(ev) || mergeEventDefaults({ event_date: CURRENT_EVENT_DATE });
   const url = buildBindUrl(email);
   return {
-    subject: `💻 AI 共學聚 ${EVENT_LABEL.split('（')[0]} Meet 連結 — ${EVENT_LABEL}`,
-    text: `嗨 ${name}！\n\n你已報名 AI 共學聚 ✅\n\n📅 ${EVENT_LABEL}\n📌 主題：${EVENT_TOPIC}\n\n💻 Meet 連結：\n${MEET_URL}\n🔔 19:50 開放進入教室、20:00 準時開始\n\n📋 上課前請準備：\n${EVENT_PREP}\n\n────\n\n📲 想接收 LINE 即時提醒？\n回我們的官方 LINE OA 完成綁定（30 秒）：\n${url}\n或在 LINE OA 對話直接傳這個 Email 給我們也行 🌱\n\n— AI 共學聚團隊 🧬`,
+    subject: `💻 AI 共學聚 ${ev.label.split('（')[0]} Meet 連結 — ${ev.label}`,
+    text: `嗨 ${name}！\n\n你已報名 AI 共學聚 ✅\n\n📅 ${ev.label}\n📌 主題：${ev.topic}\n\n💻 Meet 連結：\n${ev.meet_url}\n🔔 19:50 開放進入教室、20:00 準時開始\n\n📋 上課前請準備：\n${ev.prep}\n\n────\n\n📲 想接收 LINE 即時提醒？\n回我們的官方 LINE OA 完成綁定（30 秒）：\n${url}\n或在 LINE OA 對話直接傳這個 Email 給我們也行 🌱\n\n— AI 共學聚團隊 🧬`,
   };
 }
 
@@ -315,9 +388,10 @@ app.get('/check-email', async (req, res) => {
   const email = (req.query.email || '').trim().toLowerCase();
   if (!email) return res.json({ registered: false });
   // 只檢查當前場次：之前場次報過不算重複
+  const ev = await getCurrentEvent();
   const result = await pool.query(
     'SELECT name, attendance FROM registrations WHERE email=$1 AND event_date=$2',
-    [email, CURRENT_EVENT_DATE]
+    [email, ev.event_date]
   );
   if (result.rows[0]) {
     const r = result.rows[0];
@@ -340,24 +414,26 @@ app.post('/register', async (req, res) => {
     return res.status(400).json({ success: false, message: '姓名和 Email 為必填' });
   }
 
+  const ev = await getCurrentEvent();
+
   // 防呆：已報名直接回傳提示（只檢查當前場次，跨場次允許再報一次）
   const existing = await pool.query(
     'SELECT name, attendance, line_user_id FROM registrations WHERE email=$1 AND event_date=$2',
-    [email, CURRENT_EVENT_DATE]
+    [email, ev.event_date]
   );
   if (existing.rows[0]) {
     const reg = existing.rows[0];
     if (reg.line_user_id) {
       // 已綁 LINE → 推 LINE 提醒（附 Meet 連結，方便重複查看）
       await sendLine(reg.line_user_id,
-        `嗨 ${reg.name}！\n\n你已報名 AI 共學聚 ✅\n\n📅 ${EVENT_LABEL}\n📌 主題：${EVENT_TOPIC}\n\n💻 Meet 連結：\n${MEET_URL}\n\n活動前 30 分鐘會在這裡再提醒一次 🧬`
+        `嗨 ${reg.name}！\n\n你已報名 AI 共學聚 ✅\n\n📅 ${ev.label}\n📌 主題：${ev.topic}\n\n💻 Meet 連結：\n${ev.meet_url}\n\n活動前 30 分鐘會在這裡再提醒一次 🧬`
       );
     } else {
       // 未綁 LINE → Email 提醒（帶 Meet 連結）+ 鼓勵綁 LINE
       await sendEmail(
         email,
         '📋 你已報名 AI 共學聚！',
-        `嗨 ${reg.name}！\n\n你已報名 AI 共學聚 ✅\n\n📅 ${EVENT_LABEL}\n📌 主題：${EVENT_TOPIC}\n\n💻 Meet 連結：\n${MEET_URL}\n\n📲 還沒綁定 LINE 嗎？點下面連結一鍵綁定（30 秒），活動前 30 分鐘會在 LINE 再提醒你：\n${buildBindUrl(email)}\n\n— AI 共學聚團隊 🧬`
+        `嗨 ${reg.name}！\n\n你已報名 AI 共學聚 ✅\n\n📅 ${ev.label}\n📌 主題：${ev.topic}\n\n💻 Meet 連結：\n${ev.meet_url}\n\n📲 還沒綁定 LINE 嗎？點下面連結一鍵綁定（30 秒），活動前 30 分鐘會在 LINE 再提醒你：\n${buildBindUrl(email)}\n\n— AI 共學聚團隊 🧬`
       );
     }
     return res.json({ success: false, duplicate: true, name: reg.name, attendance: reg.attendance });
@@ -377,7 +453,7 @@ app.post('/register', async (req, res) => {
         tools=EXCLUDED.tools, tools_other=EXCLUDED.tools_other,
         job_type=EXCLUDED.job_type, source=EXCLUDED.source,
         want_to_learn=EXCLUDED.want_to_learn, subscribe_line=EXCLUDED.subscribe_line
-    `, [name, email, attendance, interestStr, level||'', toolsStr, tools_other||'', job_type||'', source||'', want_to_learn||'', subscribe_line||'', CURRENT_EVENT_DATE]);
+    `, [name, email, attendance, interestStr, level||'', toolsStr, tools_other||'', job_type||'', source||'', want_to_learn||'', subscribe_line||'', ev.event_date]);
 
     // 嘗試連結已有的 LINE 綁定
     const binding = await pool.query('SELECT * FROM line_bindings WHERE email=$1', [email]);
@@ -391,23 +467,23 @@ app.post('/register', async (req, res) => {
     const isGoing = attendance === 'Yes' || attendance === 'Maybe';
     sendEmail(
       email,
-      isGoing ? `✅ AI 共學聚 — ${EVENT_LABEL.split('（')[0]} 報名確認｜Meet 連結` : 'AI 共學聚 — 感謝填寫！',
+      isGoing ? `✅ AI 共學聚 — ${ev.label.split('（')[0]} 報名確認｜Meet 連結` : 'AI 共學聚 — 感謝填寫！',
       isGoing
-        ? `嗨 ${name}！\n\n感謝你報名 AI 共學聚 🌱\n\n📅 ${EVENT_LABEL}\n📌 主題：${EVENT_TOPIC}\n\n💻 Meet 連結：\n${MEET_URL}\n🔔 19:50 開放進入教室、20:00 準時開始\n\n📲 完成 LINE 綁定可即時收 Meet 連結 + 活動前 30 分鐘 LINE 提醒：\n${buildBindUrl(email)}\n👆 點下去登入 LINE → 同意 → 加好友 → 自動完成，30 秒內搞定\n\n📋 上課前請準備：\n${EVENT_PREP}\n\n— AI 共學聚團隊 🧬`
-        : `嗨 ${name}！\n\n感謝你填寫表單！本場主題「${EVENT_TOPIC}」於 ${EVENT_LABEL}，若之後想參加歡迎再回來填一次 📅\n\n— AI 共學聚團隊 🧬`
+        ? `嗨 ${name}！\n\n感謝你報名 AI 共學聚 🌱\n\n📅 ${ev.label}\n📌 主題：${ev.topic}\n\n💻 Meet 連結：\n${ev.meet_url}\n🔔 19:50 開放進入教室、20:00 準時開始\n\n📲 完成 LINE 綁定可即時收 Meet 連結 + 活動前 30 分鐘 LINE 提醒：\n${buildBindUrl(email)}\n👆 點下去登入 LINE → 同意 → 加好友 → 自動完成，30 秒內搞定\n\n📋 上課前請準備：\n${ev.prep}\n\n— AI 共學聚團隊 🧬`
+        : `嗨 ${name}！\n\n感謝你填寫表單！本場主題「${ev.topic}」於 ${ev.label}，若之後想參加歡迎再回來填一次 📅\n\n— AI 共學聚團隊 🧬`
     ).then(result => {
       // 寄信結果寫回 DB 供 admin 後台查看（首次報名確認信專用，duplicate/cron 不覆蓋）
       if (result?.ok) {
         pool.query(
           `UPDATE registrations SET email_sent_at=NOW(), email_status='sent', email_error=NULL
            WHERE email=$1 AND event_date=$2`,
-          [email, CURRENT_EVENT_DATE]
+          [email, ev.event_date]
         ).catch(e => console.error('[Email UPDATE ok]', e.message));
       } else {
         pool.query(
           `UPDATE registrations SET email_status='failed', email_error=$1
            WHERE email=$2 AND event_date=$3`,
-          [(result?.error || 'unknown').slice(0, 500), email, CURRENT_EVENT_DATE]
+          [(result?.error || 'unknown').slice(0, 500), email, ev.event_date]
         ).catch(e => console.error('[Email UPDATE fail]', e.message));
       }
     });
@@ -415,7 +491,7 @@ app.post('/register', async (req, res) => {
     // 雙通道通知：不管有沒有綁 LINE，Email 一定帶 Meet 連結（上方）；若已綁 LINE，再加推一次 LINE
     if (isGoing && binding.rows[0]?.line_user_id) {
       sendLine(binding.rows[0].line_user_id,
-        `嗨 ${name}！\n\n你已報名 AI 共學聚 ✅\n\n📅 ${EVENT_LABEL}\n📌 主題：${EVENT_TOPIC}\n\n💻 Meet 連結：\n${MEET_URL}\n🔔 19:50 開放、20:00 準時開始\n\n📋 上課前請準備：\n${EVENT_PREP}\n\n活動前 30 分鐘會在這裡再提醒你一次 🧬`);
+        `嗨 ${name}！\n\n你已報名 AI 共學聚 ✅\n\n📅 ${ev.label}\n📌 主題：${ev.topic}\n\n💻 Meet 連結：\n${ev.meet_url}\n🔔 19:50 開放、20:00 準時開始\n\n📋 上課前請準備：\n${ev.prep}\n\n活動前 30 分鐘會在這裡再提醒你一次 🧬`);
     }
   } catch (err) {
     console.error('[Register Error]', err.message);
@@ -476,18 +552,19 @@ app.get('/line-callback', async (req, res) => {
       VALUES ($1,$2,$3) ON CONFLICT (line_user_id) DO UPDATE SET email=EXCLUDED.email, display_name=EXCLUDED.display_name
     `, [userId, displayName, email.toLowerCase()]);
 
+    const ev = await getCurrentEvent();
     const reg = await pool.query('SELECT * FROM registrations WHERE email=$1', [email.toLowerCase()]);
     if (reg.rows[0]) {
       await pool.query('UPDATE registrations SET line_user_id=$1 WHERE email=$2', [userId, email.toLowerCase()]);
       // 綁定成功 → 立即推 Meet 連結（不再等當天 cron）
       await sendLine(userId,
-        `已為你完成綁定 ✅\n\n${reg.rows[0].name} 你好！\n${EVENT_LABEL} AI 共學聚見 🌱\n📌 主題：${EVENT_TOPIC}\n\n💻 Meet 連結（已寄到信箱，這裡再給你一份）：\n${MEET_URL}\n🔔 19:50 開放進入教室、20:00 準時開始\n\n📋 上課前請準備：\n${EVENT_PREP}\n\n活動前 30 分鐘會在這裡再提醒你 🧬`
+        `已為你完成綁定 ✅\n\n${reg.rows[0].name} 你好！\n${ev.label} AI 共學聚見 🌱\n📌 主題：${ev.topic}\n\n💻 Meet 連結（已寄到信箱，這裡再給你一份）：\n${ev.meet_url}\n🔔 19:50 開放進入教室、20:00 準時開始\n\n📋 上課前請準備：\n${ev.prep}\n\n活動前 30 分鐘會在這裡再提醒你 🧬`
       );
       res.redirect('/?bound=success&name=' + encodeURIComponent(reg.rows[0].name));
     } else {
       // 外部報名者（如活動通）：line_bindings 已寫入，立即推 Meet 連結
       await sendLine(userId,
-        `已為你完成綁定 ✅\n\n${EVENT_LABEL} AI 共學聚見 🌱\n📌 主題：${EVENT_TOPIC}\n\n💻 Meet 連結：\n${MEET_URL}\n🔔 19:50 開放進入教室、20:00 準時開始\n\n📋 上課前請準備：\n${EVENT_PREP}\n\n活動前 30 分鐘會在這裡再提醒你 🧬`
+        `已為你完成綁定 ✅\n\n${ev.label} AI 共學聚見 🌱\n📌 主題：${ev.topic}\n\n💻 Meet 連結：\n${ev.meet_url}\n🔔 19:50 開放進入教室、20:00 準時開始\n\n📋 上課前請準備：\n${ev.prep}\n\n活動前 30 分鐘會在這裡再提醒你 🧬`
       );
       res.redirect('/?bound=success');
     }
@@ -552,9 +629,10 @@ app.post('/webhook', express.raw({ type: '*/*' }), lineMiddleware, async (req, r
       const userId = event.source.userId;
       const text = event.message.text.trim();
       const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      const ev = await getCurrentEvent();        // 當前場次（events 表單一真相源）
 
-      // 線上點名：「報到」keyword（限當前場次 CURRENT_EVENT_DATE）— 放在 alreadyBound 之前，bound 用戶也能觸發
-      // 接受純 keyword 與帶日期前綴（例如「6/1報到」「2026-06-01簽到」）兩種寫法；日期前綴只當語意糖，實際以 CURRENT_EVENT_DATE 為準
+      // 線上點名：「報到」keyword（限當前場次 ev.event_date）— 放在 alreadyBound 之前，bound 用戶也能觸發
+      // 接受純 keyword 與帶日期前綴（例如「6/1報到」「2026-06-01簽到」）兩種寫法；日期前綴只當語意糖，實際以 ev.event_date 為準
       if (/^(?:\d{1,2}[\/\-]\d{1,2}|\d{4}-\d{2}-\d{2})?\s*(報到|簽到|\+1|我來了|我到了)$/i.test(text)) {
         const bindRow = await pool.query(
           `SELECT email FROM line_bindings WHERE line_user_id=$1 AND email IS NOT NULL
@@ -571,7 +649,7 @@ app.post('/webhook', express.raw({ type: '*/*' }), lineMiddleware, async (req, r
           try { lineDisplayName = (await lineClient.getProfile(userId))?.displayName || ''; } catch (_) {}
           const exist = await pool.query(
             `SELECT id, name FROM registrations WHERE line_user_id=$1 AND event_date=$2`,
-            [userId, CURRENT_EVENT_DATE]
+            [userId, ev.event_date]
           );
           const dbNameLookup = exist.rows[0]?.name
             || (await pool.query(`SELECT name FROM registrations WHERE email=$1 ORDER BY created_at DESC LIMIT 1`, [knownEmail])).rows[0]?.name
@@ -587,11 +665,11 @@ app.post('/webhook', express.raw({ type: '*/*' }), lineMiddleware, async (req, r
               `INSERT INTO registrations (name, email, attendance, event_date, line_user_id, attended)
                VALUES ($1,$2,'Yes',$3,$4,TRUE)
                ON CONFLICT (email, event_date) DO UPDATE SET attended=TRUE, line_user_id=EXCLUDED.line_user_id`,
-              [dbName, knownEmail, CURRENT_EVENT_DATE, userId]
+              [dbName, knownEmail, ev.event_date, userId]
             );
           }
           await pool.query(`UPDATE line_bindings SET awaiting_attendance_email=FALSE WHERE line_user_id=$1`, [userId]);
-          const slidesRow = await pool.query(`SELECT slides_url FROM event_slides WHERE event_date=$1`, [CURRENT_EVENT_DATE]);
+          const slidesRow = await pool.query(`SELECT slides_url FROM event_slides WHERE event_date=$1`, [ev.event_date]);
           const slidesUrl = slidesRow.rows[0]?.slides_url || null;
           const greetLine = greetName ? `${greetName} 你好！\n\n` : '';
           const replyText = slidesUrl
@@ -606,7 +684,7 @@ app.post('/webhook', express.raw({ type: '*/*' }), lineMiddleware, async (req, r
              ON CONFLICT (line_user_id) DO UPDATE SET awaiting_attendance_email=TRUE`,
             [userId]
           );
-          const slidesRow = await pool.query(`SELECT slides_url FROM event_slides WHERE event_date=$1`, [CURRENT_EVENT_DATE]);
+          const slidesRow = await pool.query(`SELECT slides_url FROM event_slides WHERE event_date=$1`, [ev.event_date]);
           const slidesUrl = slidesRow.rows[0]?.slides_url || null;
           const replyText = slidesUrl
             ? `✅ 報到成功！\n\n📊 本場簡報下載：\n${slidesUrl}\n\n想收課後問卷 / 下一場通知，\n歡迎傳你的 Email 給我 📧`
@@ -630,13 +708,13 @@ app.post('/webhook', express.raw({ type: '*/*' }), lineMiddleware, async (req, r
             `INSERT INTO registrations (name, email, attendance, event_date, line_user_id, attended)
              VALUES ($1,$2,'Yes',$3,$4,TRUE)
              ON CONFLICT (email, event_date) DO UPDATE SET attended=TRUE, line_user_id=EXCLUDED.line_user_id`,
-            [profile.displayName || '(LINE 來賓)', email, CURRENT_EVENT_DATE, userId]
+            [profile.displayName || '(LINE 來賓)', email, ev.event_date, userId]
           );
           await pool.query(
             `UPDATE line_bindings SET awaiting_attendance_email=FALSE, email=$2, display_name=COALESCE(display_name,$3) WHERE line_user_id=$1`,
             [userId, email, profile.displayName || null]
           );
-          const slidesRow = await pool.query(`SELECT slides_url FROM event_slides WHERE event_date=$1`, [CURRENT_EVENT_DATE]);
+          const slidesRow = await pool.query(`SELECT slides_url FROM event_slides WHERE event_date=$1`, [ev.event_date]);
           const slidesUrl = slidesRow.rows[0]?.slides_url || null;
           const replyText = slidesUrl
             ? `✅ 已記下！\n\n📊 本場簡報下載：\n${slidesUrl}`
@@ -669,10 +747,10 @@ app.post('/webhook', express.raw({ type: '*/*' }), lineMiddleware, async (req, r
         const reg = await pool.query('SELECT * FROM registrations WHERE email=$1', [email]);
         if (reg.rows[0]) {
           await pool.query('UPDATE registrations SET line_user_id=$1 WHERE email=$2', [userId, email]);
-          await lineClient.replyMessage(event.replyToken, { type: 'text', text: `已為你完成綁定 ✅\n\n${reg.rows[0].name} 你好！\n${EVENT_LABEL} AI 共學聚見 🌱\n📌 主題：${EVENT_TOPIC}\n\n💻 Meet 連結：\n${MEET_URL}\n\n活動前 30 分鐘會在這裡再提醒你 🧬` });
+          await lineClient.replyMessage(event.replyToken, { type: 'text', text: `已為你完成綁定 ✅\n\n${reg.rows[0].name} 你好！\n${ev.label} AI 共學聚見 🌱\n📌 主題：${ev.topic}\n\n💻 Meet 連結：\n${ev.meet_url}\n\n活動前 30 分鐘會在這裡再提醒你 🧬` });
         } else {
           // 外部報名者（如活動通）：line_bindings 已寫入，直接通知綁定成功 + Meet 連結
-          await lineClient.replyMessage(event.replyToken, { type: 'text', text: `已為你完成綁定 ✅\n\n${EVENT_LABEL} AI 共學聚見 🌱\n📌 主題：${EVENT_TOPIC}\n\n💻 Meet 連結：\n${MEET_URL}\n\n活動前 30 分鐘會在這裡再提醒你 🧬` });
+          await lineClient.replyMessage(event.replyToken, { type: 'text', text: `已為你完成綁定 ✅\n\n${ev.label} AI 共學聚見 🌱\n📌 主題：${ev.topic}\n\n💻 Meet 連結：\n${ev.meet_url}\n\n活動前 30 分鐘會在這裡再提醒你 🧬` });
         }
       } else {
         await lineClient.replyMessage(event.replyToken, { type: 'text', text: `嗨！請傳送你報名時使用的 Email 給我\n\n例如：yourname@gmail.com` });
@@ -712,7 +790,7 @@ app.get('/admin/api/registrations', adminAuth, async (req, res) => {
       attended:     rows.filter(r => r.attended).length,
       bySource,
       byEvent,
-      currentEvent: CURRENT_EVENT_DATE,
+      currentEvent: (await getCurrentEvent()).event_date,
     },
     registrations: rows,
   });
@@ -844,7 +922,8 @@ app.delete('/admin/api/event-slides', adminAuth, async (req, res) => {
 //   POST   /admin/api/events/cancel?pw=...&event=YYYY-MM-DD    取消（status=cancelled，停發後續提醒）
 app.get('/admin/api/events', adminAuth, async (req, res) => {
   const result = await pool.query(`SELECT * FROM events ORDER BY event_date DESC`);
-  res.json({ count: result.rows.length, events: result.rows });
+  const current = await getCurrentEvent();
+  res.json({ count: result.rows.length, events: result.rows, currentEventDate: current.event_date });
 });
 
 app.post('/admin/api/events', adminAuth, async (req, res) => {
@@ -875,6 +954,7 @@ app.post('/admin/api/events', adminAuth, async (req, res) => {
         b.banner || null, b.start_at, b.end_at || null, b.registration_open_at || null,
         b.survey_url || null, b.reminder_day_offset_min, b.reminder_hour_offset_min,
         b.survey_offset_min, b.status]);
+    invalidateCurrentEvent();   // 場次內容/狀態變了 → 下次 getCurrentEvent 立即重算
     res.json({ success: true, event: result.rows[0] });
   } catch (err) {
     console.error('[events upsert]', err.message);
@@ -887,6 +967,7 @@ app.post('/admin/api/events/publish', adminAuth, async (req, res) => {
   if (!eventDate) return res.status(400).json({ error: 'Missing event' });
   const r = await pool.query(`UPDATE events SET status='published' WHERE event_date=$1 RETURNING *`, [eventDate]);
   if (!r.rowCount) return res.status(404).json({ error: 'Event not found' });
+  invalidateCurrentEvent();
   res.json({ success: true, event: r.rows[0] });
 });
 
@@ -895,14 +976,43 @@ app.post('/admin/api/events/cancel', adminAuth, async (req, res) => {
   if (!eventDate) return res.status(400).json({ error: 'Missing event' });
   const r = await pool.query(`UPDATE events SET status='cancelled' WHERE event_date=$1 RETURNING *`, [eventDate]);
   if (!r.rowCount) return res.status(404).json({ error: 'Event not found' });
+  invalidateCurrentEvent();
   res.json({ success: true, event: r.rows[0] });
+});
+
+// 後台直接上傳場次 banner 圖檔（bytes 存 DB，持久；回傳可直接填進場次 banner 欄位的 URL）。
+// 用法：POST /admin/api/upload-banner?pw=...&filename=banner-0706.png  body=圖檔 binary，Content-Type: image/*
+app.post('/admin/api/upload-banner', adminAuth, express.raw({ type: ['image/*'], limit: '8mb' }), async (req, res) => {
+  try {
+    const fn = (req.query.filename || '').replace(/[^a-zA-Z0-9._-]/g, '');
+    if (!fn || !/\.(png|jpe?g|webp)$/i.test(fn)) {
+      return res.status(400).json({ error: '檔名需為 .png/.jpg/.jpeg/.webp，例：banner-0706.png' });
+    }
+    if (!Buffer.isBuffer(req.body) || !req.body.length) {
+      return res.status(400).json({ error: '沒收到圖檔，請確認 Content-Type 為 image/* 且 body 是圖檔' });
+    }
+    const mime = req.headers['content-type'] || 'image/png';
+    await pool.query(
+      `INSERT INTO event_assets (filename, mime, bytes, updated_at)
+       VALUES ($1,$2,$3,NOW())
+       ON CONFLICT (filename) DO UPDATE SET mime=EXCLUDED.mime, bytes=EXCLUDED.bytes, updated_at=NOW()`,
+      [fn, mime, req.body]
+    );
+    // 同步寫一份到 public/（讓本次部署期間 /banner-XXXX.png 直接命中 static；重部署後仍以 /assets 為準）
+    try { fs.writeFileSync(path.join(__dirname, 'public', fn), req.body); } catch (_) {}
+    console.log(`[upload-banner] ${fn} (${mime}, ${req.body.length} bytes)`);
+    res.json({ success: true, filename: fn, url: `/assets/${fn}`, size: req.body.length });
+  } catch (err) {
+    console.error('[upload-banner]', err.message);
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // 活動後寄簡報：對當前場次 attended=TRUE 的人批次寄信
 // 用法：POST /admin/api/send-slides?pw=...&event=2026-05-18&url=<簡報URL>[&dry=1]
 app.post('/admin/api/send-slides', adminAuth, async (req, res) => {
   try {
-    const eventDate = req.query.event || CURRENT_EVENT_DATE;
+    const eventDate = req.query.event || (await getCurrentEvent()).event_date;
     const slidesUrl = req.query.url || req.body?.url;
     const dryRun = req.query.dry === '1';
     if (!slidesUrl) return res.status(400).json({ error: 'Missing ?url= (slides URL)' });
@@ -939,13 +1049,14 @@ app.post('/admin/api/send-slides', adminAuth, async (req, res) => {
 });
 
 app.get('/admin/api/binding-stats', adminAuth, async (req, res) => {
+  const ev = await getCurrentEvent();
   const renderRows = await pool.query(`
     SELECT
       COUNT(*) FILTER (WHERE attendance IN ('Yes','Maybe')) AS render_attending,
       COUNT(*) FILTER (WHERE attendance IN ('Yes','Maybe') AND line_user_id IS NOT NULL) AS render_attending_bound
     FROM registrations
     WHERE event_date=$1
-  `, [CURRENT_EVENT_DATE]);
+  `, [ev.event_date]);
   const externalRows = await pool.query(`
     SELECT COUNT(*) AS external_bound
     FROM line_bindings lb
@@ -1004,7 +1115,7 @@ async function sendRemindersForEvent(ev, type = 'day') {
 
 // 向後相容包裝：舊 admin 端點 POST /admin/api/send-reminder 仍可用，預設打當前場次。
 async function sendReminders(type = 'day') {
-  const ev = await getEventByDate(CURRENT_EVENT_DATE);
+  const ev = await getCurrentEvent();
   return sendRemindersForEvent(ev, type);
 }
 
@@ -1094,9 +1205,11 @@ async function sendBindReminders({ eventDate = null, minAgeHours = 0, dryRun = f
   const sql = `SELECT id, name, email FROM registrations WHERE ${where.join(' AND ')} ORDER BY created_at ASC`;
   const result = await pool.query(sql, params);
 
+  // 文案場次：有指定 eventDate 就讀那場，否則用當前場次（null 欄位退回 env 常數）
+  const ev = eventDate ? await getEventByDate(eventDate) : await getCurrentEvent();
   const sent = [];
   for (const reg of result.rows) {
-    const { subject, text } = buildBindReminderEmail(reg.name, reg.email);
+    const { subject, text } = buildBindReminderEmail(reg.name, reg.email, ev);
     if (!dryRun) {
       await sendEmail(reg.email, subject, text);
       await pool.query(`UPDATE registrations SET bind_reminded_at = NOW() WHERE id = $1`, [reg.id]);
@@ -1276,9 +1389,11 @@ app.get('/admin/api/send-invite-unregistered', adminAuth, async (req, res) => {
 });
 
 // T+24h 自動：每日 12:00（台灣時間）跑一次，抓 24h 前報名但還沒綁的，寄第一次提醒
-cron.schedule('0 12 * * *', () => {
-  sendBindReminders({ eventDate: CURRENT_EVENT_DATE, minAgeHours: 24 })
-    .catch(err => console.error('[BindReminder Cron Error]', err.message));
+cron.schedule('0 12 * * *', async () => {
+  try {
+    const ev = await getCurrentEvent();
+    await sendBindReminders({ eventDate: ev.event_date, minAgeHours: 24 });
+  } catch (err) { console.error('[BindReminder Cron Error]', err.message); }
 }, { timezone: 'Asia/Taipei' });
 
 // ─── ECPay 付款通知 → LINE Push（Gmail IMAP polling）────────────────────────────
@@ -1443,7 +1558,9 @@ app.get('/admin/ecpay-poll', async (req, res) => {
 
 // ─── Start ───────────────────────────────────────────────────────────────────
 const PORT = process.env.PORT || 3000;
-initDB().then(() => {
+initDB().then(async () => {
+  const cur = await getCurrentEvent();   // 暖機：解析當前場次（events 表單一真相源）
+  console.log(`   當前場次（events 表）: ${cur.event_date} — ${cur.label}`);
   app.listen(PORT, () => {
     console.log(`🚀 伺服器啟動 port ${PORT}`);
     console.log(`   Resend (寄信):     ${resend ? '✅ 已設定' : '❌ RESEND_API_KEY 未設定 — 所有信都會 silent skip'}`);

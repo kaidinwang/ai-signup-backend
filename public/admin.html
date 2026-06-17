@@ -37,7 +37,7 @@
     <div class="flex items-center justify-between">
         <div>
             <h1 class="text-2xl font-bold">🧬 AI 共學聚 — 後台管理</h1>
-            <p class="text-slate-500 text-sm mt-1">6/1（一）20:00–21:30 | 報名管理系統</p>
+            <p id="headerSub" class="text-slate-500 text-sm mt-1">報名管理系統</p>
         </div>
         <div class="flex gap-3">
             <button onclick="sendReminder('day')" class="px-4 py-2 bg-yellow-600 hover:bg-yellow-500 rounded-xl text-sm font-medium transition-all flex items-center gap-2">
@@ -52,6 +52,119 @@
             <button onclick="loadData()" class="px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-xl text-sm transition-all">
                 <i class="fas fa-sync"></i>
             </button>
+        </div>
+    </div>
+
+    <!-- 場次管理 / 上架 -->
+    <div class="glass rounded-2xl overflow-hidden">
+        <button onclick="toggleEventPanel()" class="w-full flex items-center justify-between p-4 text-left hover:bg-white/5 transition-all">
+            <span class="font-bold text-lg">🚀 場次管理 — 上架下一場</span>
+            <span class="text-slate-400 text-sm"><span id="eventPanelHint">填日期＋必要資料 → 上架即接管所有自動化</span> <i id="eventPanelChevron" class="fas fa-chevron-down ml-2"></i></span>
+        </button>
+        <div id="eventPanel" class="hidden p-5 pt-0 space-y-6">
+
+            <!-- 建立 / 編輯表單 -->
+            <div class="bg-slate-900/50 rounded-xl p-5 space-y-4">
+                <div class="flex items-center justify-between">
+                    <h3 class="font-semibold text-slate-200" id="evFormTitle">➕ 建立新場次</h3>
+                    <button onclick="resetEventForm()" class="text-xs text-slate-400 hover:text-slate-200">清空表單</button>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <label class="text-sm space-y-1">
+                        <span class="text-slate-400">場次日期 <span class="text-red-400">*</span></span>
+                        <input id="evDate" type="date" onchange="onEvFieldChange()" class="w-full p-2 rounded-lg bg-slate-800 border border-white/10 text-white">
+                    </label>
+                    <label class="text-sm space-y-1">
+                        <span class="text-slate-400">講師時段 preset</span>
+                        <select id="evPreset" onchange="onPresetChange()" class="w-full p-2 rounded-lg bg-slate-800 border border-white/10 text-white">
+                            <option value="din">Din 場（20:00–21:00）</option>
+                            <option value="abang">阿邦老師場（20:00–21:30）</option>
+                            <option value="custom">自訂時間</option>
+                        </select>
+                    </label>
+                    <div class="grid grid-cols-2 gap-2">
+                        <label class="text-sm space-y-1">
+                            <span class="text-slate-400">開始</span>
+                            <input id="evStart" type="time" onchange="onEvFieldChange()" class="w-full p-2 rounded-lg bg-slate-800 border border-white/10 text-white">
+                        </label>
+                        <label class="text-sm space-y-1">
+                            <span class="text-slate-400">結束</span>
+                            <input id="evEnd" type="time" onchange="onEvFieldChange()" class="w-full p-2 rounded-lg bg-slate-800 border border-white/10 text-white">
+                        </label>
+                    </div>
+                </div>
+
+                <label class="text-sm space-y-1 block">
+                    <span class="text-slate-400">短標題 <span class="text-red-400">*</span>（admin 用，例：AI 共學聚 7/6）</span>
+                    <input id="evTitle" type="text" placeholder="AI 共學聚 7/6" class="w-full p-2 rounded-lg bg-slate-800 border border-white/10 text-white">
+                </label>
+                <label class="text-sm space-y-1 block">
+                    <span class="text-slate-400">主題 <span class="text-red-400">*</span>（文案標題，會出現在報名確認信／LINE）</span>
+                    <input id="evTopic" type="text" placeholder="例：用 ChatGPT 打造你的內容系統" class="w-full p-2 rounded-lg bg-slate-800 border border-white/10 text-white">
+                </label>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <label class="text-sm space-y-1">
+                        <span class="text-slate-400">人類可讀時段 label（自動產生，可改）</span>
+                        <input id="evLabel" type="text" placeholder="7/6（一）20:00–21:00 線上" class="w-full p-2 rounded-lg bg-slate-800 border border-white/10 text-white">
+                    </label>
+                    <label class="text-sm space-y-1">
+                        <span class="text-slate-400">Meet 連結</span>
+                        <input id="evMeet" type="text" placeholder="https://meet.google.com/xxx-xxxx-xxx" class="w-full p-2 rounded-lg bg-slate-800 border border-white/10 text-white">
+                    </label>
+                </div>
+
+                <label class="text-sm space-y-1 block">
+                    <span class="text-slate-400">課前準備 prep（換行分點）</span>
+                    <textarea id="evPrep" rows="2" placeholder="1. 筆電&#10;2. ChatGPT 帳號" class="w-full p-2 rounded-lg bg-slate-800 border border-white/10 text-white"></textarea>
+                </label>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <label class="text-sm space-y-1">
+                        <span class="text-slate-400">課後問卷連結 survey_url</span>
+                        <input id="evSurvey" type="text" placeholder="https://forms.gle/..." class="w-full p-2 rounded-lg bg-slate-800 border border-white/10 text-white">
+                    </label>
+                    <div class="text-sm space-y-1">
+                        <span class="text-slate-400">Banner 圖（直接上傳）</span>
+                        <div class="flex items-center gap-2">
+                            <input id="evBannerFile" type="file" accept="image/*" class="flex-1 text-xs text-slate-300 file:mr-2 file:py-1 file:px-3 file:rounded-lg file:border-0 file:bg-slate-700 file:text-white">
+                            <button onclick="uploadBanner()" type="button" class="px-3 py-2 bg-indigo-600 hover:bg-indigo-500 rounded-lg text-xs whitespace-nowrap">上傳</button>
+                        </div>
+                        <input id="evBanner" type="text" placeholder="/assets/banner-0706.png（上傳後自動填）" class="w-full p-2 rounded-lg bg-slate-800 border border-white/10 text-white text-xs">
+                        <div id="evBannerPreview"></div>
+                    </div>
+                </div>
+
+                <details class="text-sm">
+                    <summary class="text-slate-400 cursor-pointer select-none">進階：提醒時間 offset（分鐘，留空用預設）</summary>
+                    <div class="grid grid-cols-3 gap-3 mt-3">
+                        <label class="space-y-1"><span class="text-slate-500 text-xs">前一天提醒（預設 1440）</span><input id="evDayOff" type="number" placeholder="1440" class="w-full p-2 rounded-lg bg-slate-800 border border-white/10 text-white"></label>
+                        <label class="space-y-1"><span class="text-slate-500 text-xs">當天提醒（預設 90）</span><input id="evHourOff" type="number" placeholder="90" class="w-full p-2 rounded-lg bg-slate-800 border border-white/10 text-white"></label>
+                        <label class="space-y-1"><span class="text-slate-500 text-xs">課後問卷（預設 720）</span><input id="evSurveyOff" type="number" placeholder="720" class="w-full p-2 rounded-lg bg-slate-800 border border-white/10 text-white"></label>
+                    </div>
+                </details>
+
+                <div class="flex items-center gap-3 pt-1">
+                    <button onclick="saveEvent(true)" class="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 rounded-xl font-bold transition-all flex items-center gap-2"><i class="fas fa-rocket"></i> 建立並上架</button>
+                    <button onclick="saveEvent(false)" class="px-4 py-2.5 bg-slate-700 hover:bg-slate-600 rounded-xl text-sm transition-all">只存草稿</button>
+                    <span id="evSaveMsg" class="text-sm"></span>
+                </div>
+                <p class="text-xs text-slate-500 leading-relaxed">📌 上架（published）後，每分鐘的自動化 cron 會接管這場：前一天 / 當天提醒、課後問卷補推、LINE 報到都對這場生效。當前場次過了，會自動接棒到下一個已上架的未來場次，<b>不需要再改 Render 環境變數</b>。</p>
+            </div>
+
+            <!-- 場次列表 -->
+            <div>
+                <h3 class="font-semibold text-slate-300 text-sm uppercase tracking-wide mb-3">📋 所有場次</h3>
+                <div class="overflow-x-auto rounded-xl border border-white/5">
+                    <table>
+                        <thead><tr>
+                            <th>日期</th><th>標題 / 主題</th><th>時段</th><th>狀態</th><th>自動化戳記</th><th>操作</th>
+                        </tr></thead>
+                        <tbody id="eventsBody"></tbody>
+                    </table>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -179,6 +292,7 @@ async function loadData() {
         filteredData = [...allData];
         renderTable();
         renderCharts();
+        loadEvents();
     } catch (e) {
         alert('無法連線到後端伺服器，請確認是否已啟動');
     }
@@ -443,6 +557,217 @@ function computeStats(rows) {
         byEvent,
         currentEvent: currentEventDate,
     };
+}
+
+// ─── 場次管理 / 上架 ──────────────────────────────────────────────────────────
+let eventsCache = [];
+const WD = ['日','一','二','三','四','五','六'];
+
+function toggleEventPanel() {
+    const p = document.getElementById('eventPanel');
+    const open = p.classList.toggle('hidden') === false;
+    document.getElementById('eventPanelChevron').className = `fas fa-chevron-${open ? 'up' : 'down'} ml-2`;
+}
+
+// 由日期＋起訖時間自動產生 label，例：7/6（一）20:00–21:00 線上
+function recomputeLabel() {
+    const d = document.getElementById('evDate').value;
+    const s = document.getElementById('evStart').value;
+    const e = document.getElementById('evEnd').value;
+    if (!d) return;
+    const dt = new Date(d + 'T12:00:00');
+    const md = `${dt.getMonth() + 1}/${dt.getDate()}`;
+    const wd = WD[dt.getDay()];
+    const span = s ? (e ? `${s}–${e}` : s) : '';
+    document.getElementById('evLabel').value = `${md}（${wd}）${span} 線上`.replace(/\s+/g, ' ').trim();
+}
+
+function onPresetChange() {
+    const v = document.getElementById('evPreset').value;
+    if (v === 'din')   { document.getElementById('evStart').value = '20:00'; document.getElementById('evEnd').value = '21:00'; }
+    if (v === 'abang') { document.getElementById('evStart').value = '20:00'; document.getElementById('evEnd').value = '21:30'; }
+    recomputeLabel();
+}
+
+function onEvFieldChange() {
+    recomputeLabel();
+    // 自動建議短標題（未填時）
+    const d = document.getElementById('evDate').value;
+    if (d && !document.getElementById('evTitle').value) {
+        const dt = new Date(d + 'T12:00:00');
+        document.getElementById('evTitle').value = `AI 共學聚 ${dt.getMonth() + 1}/${dt.getDate()}`;
+    }
+}
+
+function bannerFilenameFromDate(ext) {
+    const d = document.getElementById('evDate').value;
+    if (!d) return null;
+    const dt = new Date(d + 'T12:00:00');
+    const mm = String(dt.getMonth() + 1).padStart(2, '0');
+    const dd = String(dt.getDate()).padStart(2, '0');
+    return `banner-${mm}${dd}.${ext}`;
+}
+
+async function uploadBanner() {
+    const file = document.getElementById('evBannerFile').files[0];
+    if (!file) return alert('請先選擇圖檔');
+    if (!document.getElementById('evDate').value) return alert('請先填場次日期（用來命名 banner）');
+    const ext = (file.name.split('.').pop() || 'png').toLowerCase().replace('jpeg', 'jpg');
+    const fn = bannerFilenameFromDate(ext);
+    const msg = document.getElementById('evSaveMsg');
+    msg.textContent = '上傳中…'; msg.className = 'text-sm text-slate-400';
+    try {
+        const res = await fetch(`/admin/api/upload-banner?pw=${encodeURIComponent(adminPw)}&filename=${encodeURIComponent(fn)}`, {
+            method: 'POST',
+            headers: { 'Content-Type': file.type || 'image/png' },
+            body: file,
+        });
+        const json = await res.json();
+        if (!res.ok) throw new Error(json.error || '上傳失敗');
+        document.getElementById('evBanner').value = json.url;
+        document.getElementById('evBannerPreview').innerHTML = `<img src="${json.url}?t=${Date.now()}" class="mt-2 rounded-lg max-h-24 border border-white/10">`;
+        msg.textContent = `✅ 已上傳 ${json.filename}（${(json.size/1024).toFixed(0)} KB）`; msg.className = 'text-sm text-emerald-400';
+    } catch (e) {
+        msg.textContent = '❌ ' + e.message; msg.className = 'text-sm text-red-400';
+    }
+}
+
+function num(id) { const v = document.getElementById(id).value.trim(); return v === '' ? undefined : parseInt(v); }
+
+async function saveEvent(publish) {
+    const date = document.getElementById('evDate').value;
+    const title = document.getElementById('evTitle').value.trim();
+    const topic = document.getElementById('evTopic').value.trim();
+    const start = document.getElementById('evStart').value;
+    const end = document.getElementById('evEnd').value;
+    const msg = document.getElementById('evSaveMsg');
+    if (!date || !title || !topic || !start) {
+        msg.textContent = '❌ 場次日期、短標題、主題、開始時間為必填'; msg.className = 'text-sm text-red-400';
+        return;
+    }
+    // 不勾「上架」時：既有場次保留原狀態（避免把已上架的當前場誤降為草稿），新場次才預設 draft
+    const existing = eventsCache.find(e => e.event_date === date);
+    const status = publish ? 'published' : (existing ? existing.status : 'draft');
+    const body = {
+        event_date: date, title, topic,
+        label: document.getElementById('evLabel').value.trim() || null,
+        prep: document.getElementById('evPrep').value.trim() || null,
+        meet_url: document.getElementById('evMeet').value.trim() || null,
+        banner: document.getElementById('evBanner').value.trim() || null,
+        start_at: `${date}T${start}:00+08:00`,
+        end_at: end ? `${date}T${end}:00+08:00` : null,
+        survey_url: document.getElementById('evSurvey').value.trim() || null,
+        reminder_day_offset_min: num('evDayOff'),
+        reminder_hour_offset_min: num('evHourOff'),
+        survey_offset_min: num('evSurveyOff'),
+        status,
+    };
+    if (publish && !confirm(`確定要「建立並上架」${date}（${title}）？\n\n上架後自動化 cron 會開始追這場（提醒／問卷／報到）。`)) return;
+    msg.textContent = '儲存中…'; msg.className = 'text-sm text-slate-400';
+    try {
+        const res = await fetch(`/admin/api/events?pw=${encodeURIComponent(adminPw)}`, {
+            method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+        });
+        const json = await res.json();
+        if (!res.ok) throw new Error(json.error || '儲存失敗');
+        msg.textContent = publish ? `🚀 已建立並上架 ${date}` : `💾 已存草稿 ${date}`; msg.className = 'text-sm text-emerald-400';
+        await loadEvents();
+        loadData();   // 重新整理 stats 的「當前場次」
+    } catch (e) {
+        msg.textContent = '❌ ' + e.message; msg.className = 'text-sm text-red-400';
+    }
+}
+
+function resetEventForm() {
+    ['evDate','evTitle','evTopic','evLabel','evMeet','evPrep','evSurvey','evBanner','evDayOff','evHourOff','evSurveyOff'].forEach(id => document.getElementById(id).value = '');
+    document.getElementById('evPreset').value = 'din';
+    document.getElementById('evStart').value = '20:00';
+    document.getElementById('evEnd').value = '21:00';
+    document.getElementById('evBannerPreview').innerHTML = '';
+    document.getElementById('evFormTitle').textContent = '➕ 建立新場次';
+    document.getElementById('evSaveMsg').textContent = '';
+}
+
+async function loadEvents() {
+    try {
+        const res = await fetch(`/admin/api/events?pw=${encodeURIComponent(adminPw)}`);
+        if (!res.ok) return;
+        const json = await res.json();
+        eventsCache = json.events || [];
+        renderEvents(json.currentEventDate);
+        // 同步頂部副標
+        const cur = eventsCache.find(e => e.event_date === json.currentEventDate);
+        document.getElementById('headerSub').textContent = cur ? `當前場次：${cur.label || cur.event_date}｜報名管理系統` : '報名管理系統';
+    } catch (_) {}
+}
+
+const STATUS_BADGE = {
+    published: '<span class="tag bg-emerald-500/20 text-emerald-300">🟢 已上架</span>',
+    draft:     '<span class="tag bg-slate-500/20 text-slate-300">📝 草稿</span>',
+    past:      '<span class="tag bg-slate-700 text-slate-500">⏪ 已結束</span>',
+    cancelled: '<span class="tag bg-red-500/20 text-red-300">✖ 已取消</span>',
+};
+
+function renderEvents(currentDate) {
+    const fmt = s => s ? new Date(s).toLocaleString('zh-TW', { month:'numeric', day:'numeric', hour:'2-digit', minute:'2-digit' }) : '—';
+    document.getElementById('eventsBody').innerHTML = eventsCache.map(e => {
+        const isCur = e.event_date === currentDate;
+        const stamps = [
+            e.reminder_day_sent_at ? '前一天✅' : '前一天⬜',
+            e.reminder_hour_sent_at ? '當天✅' : '當天⬜',
+            e.survey_sent_at ? '問卷✅' : '問卷⬜',
+        ].join(' ');
+        return `<tr>
+            <td class="whitespace-nowrap font-medium">${esc(e.event_date)} ${isCur ? '<span class="tag bg-amber-500/20 text-amber-300">⭐ 當前</span>' : ''}</td>
+            <td class="max-w-[260px]"><div class="font-medium">${esc(e.title)}</div><div class="text-xs text-slate-500">${esc(e.topic || '')}</div></td>
+            <td class="text-xs text-slate-400 whitespace-nowrap">${esc(e.label || '—')}</td>
+            <td>${STATUS_BADGE[e.status] || esc(e.status)}</td>
+            <td class="text-xs text-slate-500 whitespace-nowrap">${stamps}</td>
+            <td class="whitespace-nowrap">
+                <button onclick="editEvent('${esc(e.event_date)}')" class="text-blue-400 hover:text-blue-300 text-xs px-2 py-1">編輯</button>
+                ${e.status !== 'published' ? `<button onclick="publishEvent('${esc(e.event_date)}')" class="text-emerald-400 hover:text-emerald-300 text-xs px-2 py-1">上架</button>` : ''}
+                ${e.status === 'published' ? `<button onclick="cancelEvent('${esc(e.event_date)}')" class="text-red-400 hover:text-red-300 text-xs px-2 py-1">取消</button>` : ''}
+            </td>
+        </tr>`;
+    }).join('') || '<tr><td colspan="6" class="text-center text-slate-600 py-6">尚無場次</td></tr>';
+}
+
+function editEvent(date) {
+    const e = eventsCache.find(x => x.event_date === date);
+    if (!e) return;
+    const toHHMM = s => s ? new Date(s).toLocaleTimeString('en-GB', { timeZone:'Asia/Taipei', hour:'2-digit', minute:'2-digit' }) : '';
+    document.getElementById('evDate').value = e.event_date;
+    document.getElementById('evTitle').value = e.title || '';
+    document.getElementById('evTopic').value = e.topic || '';
+    document.getElementById('evLabel').value = e.label || '';
+    document.getElementById('evMeet').value = e.meet_url || '';
+    document.getElementById('evPrep').value = e.prep || '';
+    document.getElementById('evSurvey').value = e.survey_url || '';
+    document.getElementById('evBanner').value = e.banner || '';
+    document.getElementById('evStart').value = toHHMM(e.start_at);
+    document.getElementById('evEnd').value = toHHMM(e.end_at);
+    document.getElementById('evDayOff').value = e.reminder_day_offset_min ?? '';
+    document.getElementById('evHourOff').value = e.reminder_hour_offset_min ?? '';
+    document.getElementById('evSurveyOff').value = e.survey_offset_min ?? '';
+    document.getElementById('evPreset').value = 'custom';
+    document.getElementById('evBannerPreview').innerHTML = e.banner ? `<img src="${esc(e.banner)}?t=${Date.now()}" class="mt-2 rounded-lg max-h-24 border border-white/10">` : '';
+    document.getElementById('evFormTitle').textContent = `✏️ 編輯場次 ${e.event_date}`;
+    document.getElementById('evSaveMsg').textContent = '';
+    document.getElementById('eventPanel').classList.remove('hidden');
+    document.getElementById('eventPanelChevron').className = 'fas fa-chevron-up ml-2';
+    document.getElementById('evDate').scrollIntoView({ behavior:'smooth', block:'center' });
+}
+
+async function publishEvent(date) {
+    if (!confirm(`確定要上架 ${date}？自動化會開始追這場。`)) return;
+    const res = await fetch(`/admin/api/events/publish?pw=${encodeURIComponent(adminPw)}&event=${encodeURIComponent(date)}`, { method: 'POST' });
+    if (res.ok) { await loadEvents(); loadData(); } else alert('上架失敗');
+}
+
+async function cancelEvent(date) {
+    if (!confirm(`確定要取消 ${date}？會停發後續提醒。`)) return;
+    const res = await fetch(`/admin/api/events/cancel?pw=${encodeURIComponent(adminPw)}&event=${encodeURIComponent(date)}`, { method: 'POST' });
+    if (res.ok) { await loadEvents(); loadData(); } else alert('取消失敗');
 }
 
 document.getElementById('pwInput')?.addEventListener('keydown', e => e.key === 'Enter' && login());
