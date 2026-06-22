@@ -300,6 +300,11 @@ async function getEventByDate(date) {
 // 表空 / 查詢失敗 → 退回 server.js 頂部 env 常數組成的虛擬場次（向後相容，行為不變）。
 let _currentEventCache = null;
 let _currentEventCachedAt = 0;
+// cron（runEventAutomation）用的近期 published 場次清單快取。
+// 目的：讓 cron 平常只用記憶體判斷提醒到點與否，沒到點完全不查 DB →
+// Neon compute 能 scale-to-zero，免費額度才撐得過一個月（本次掛站根因之一）。
+let _eventListCache = null;
+let _eventListCachedAt = 0;
 
 function taipeiToday() {
   return new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Taipei' });
@@ -336,7 +341,7 @@ async function getCurrentEvent() {
 }
 
 // 場次異動（上架/取消/建立）後呼叫，讓下一次 getCurrentEvent 立即重算。
-function invalidateCurrentEvent() { _currentEventCachedAt = 0; }
+function invalidateCurrentEvent() { _currentEventCachedAt = 0; _eventListCache = null; }
 
 // 同步存取點（給少數同步函式如 isEventLive 用）：回最後一次解析結果，未解析過退 env。
 function currentEventSync() {
@@ -1162,23 +1167,43 @@ async function sendPostEventSurvey(ev) {
   return result.rows.length;
 }
 
-// ─── 自動化心臟：每 15 分鐘掃 events 表，到點就發 day/hour 提醒、課後問卷補推（取代寫死日期的 cron）──
+// ─── 自動化心臟：每 5 分鐘掃近期 published 場次，到點就發 day/hour 提醒、課後問卷補推 ──
 // 冪等：每個動作發完蓋戳記（reminder_day_sent_at / reminder_hour_sent_at / survey_sent_at），不重發。
+//
+// 💸 省 Neon 額度的關鍵：場次清單走 6 小時記憶體快取（_eventListCache），cron 平常只在
+//    記憶體裡判斷有沒有到點，沒到點就直接 return、完全不碰 DB → Neon compute 可 scale-to-zero。
+//    只有 (a) 快取過期重撈 (b) 真的要發提醒/問卷 (c) 後台改場次(invalidateCurrentEvent) 才查 DB。
+const EVENT_LIST_TTL = 6 * 60 * 60 * 1000; // 6 小時
+async function getRelevantEvents() {
+  const now = Date.now();
+  if (_eventListCache && now - _eventListCachedAt < EVENT_LIST_TTL) return _eventListCache;
+  const { rows } = await pool.query(
+    `SELECT * FROM events
+     WHERE status = 'published'
+       AND start_at > NOW() - INTERVAL '3 days'`
+  );
+  _eventListCache = rows;
+  _eventListCachedAt = now;
+  return rows;
+}
+
 async function runEventAutomation() {
   try {
     const now = Date.now();
-    // 撈近期相關場次：未過期太久（含結束後問卷視窗）的 published 場次
-    const { rows } = await pool.query(
-      `SELECT * FROM events
-       WHERE status = 'published'
-         AND start_at > NOW() - INTERVAL '3 days'`
-    );
+    const rows = await getRelevantEvents();   // 多數情況回記憶體快取，不打 DB
     for (const ev of rows) {
       const start = new Date(ev.start_at).getTime();
       const dayAt  = start - (ev.reminder_day_offset_min  ?? 1440) * 60000;
       const hourAt = start - (ev.reminder_hour_offset_min ?? 90)   * 60000;
       const dayDue  = !ev.reminder_day_sent_at  && now >= dayAt  && now < start;
       const hourDue = !ev.reminder_hour_sent_at && now >= hourAt && now < start;
+      let surveyAt = null, surveyDue = false;
+      if (ev.end_at && !ev.survey_sent_at) {
+        surveyAt = new Date(ev.end_at).getTime() + (ev.survey_offset_min ?? 720) * 60000;
+        surveyDue = now >= surveyAt && !!ev.survey_url;
+      }
+      // 這場沒有任何動作到點 → 不碰 DB（讓 Neon 能休眠）
+      if (!dayDue && !hourDue && !surveyDue) continue;
 
       // 同分鐘兩封都到點（通常是「遲上架」：publish 時已過 day 提醒時間）→ 只發較緊急的 hour，
       // day 直接蓋戳記但不寄，避免同一個人在同一分鐘收到兩封幾乎一樣的提醒。
@@ -1188,30 +1213,30 @@ async function runEventAutomation() {
           `UPDATE events SET reminder_hour_sent_at = NOW(), reminder_day_sent_at = NOW() WHERE id = $1`,
           [ev.id]
         );
+        ev.reminder_hour_sent_at = ev.reminder_day_sent_at = new Date(); // 同步快取，避免下輪重發
         console.log(`[EventAutomation] ${ev.event_date} 遲上架：day+hour 同分鐘到點，只發 hour、day 標記略過`);
       } else if (dayDue) {
         await sendRemindersForEvent(ev, 'day');
         await pool.query(`UPDATE events SET reminder_day_sent_at = NOW() WHERE id = $1`, [ev.id]);
+        ev.reminder_day_sent_at = new Date();
       } else if (hourDue) {
         await sendRemindersForEvent(ev, 'hour');
         await pool.query(`UPDATE events SET reminder_hour_sent_at = NOW() WHERE id = $1`, [ev.id]);
+        ev.reminder_hour_sent_at = new Date();
       }
       // 課後問卷補推：結束後 survey_offset_min 分鐘，且有設 survey_url
-      if (ev.end_at && !ev.survey_sent_at) {
-        const surveyAt = new Date(ev.end_at).getTime() + (ev.survey_offset_min ?? 720) * 60000;
-        if (now >= surveyAt && (ev.survey_url)) {
-          await sendPostEventSurvey(ev);
-          await pool.query(`UPDATE events SET survey_sent_at = NOW() WHERE id = $1`, [ev.id]);
-        }
+      if (surveyDue) {
+        await sendPostEventSurvey(ev);
+        await pool.query(`UPDATE events SET survey_sent_at = NOW() WHERE id = $1`, [ev.id]);
+        ev.survey_sent_at = new Date();
       }
     }
   } catch (e) {
     console.error('[EventAutomation] error:', e.message);
   }
 }
-// ⚠️ 每 15 分鐘（原本每分鐘）：每分鐘查 DB 會讓 Neon compute 永不休眠、約 8 天燒爆免費額度。
-// 改 15 分鐘 → DB 閒置 >5 分可 scale-to-zero，費用大幅下降；day/hour 提醒最多晚 15 分鐘可接受。
-cron.schedule('*/15 * * * *', runEventAutomation, { timezone: 'Asia/Taipei' });
+// 每 5 分鐘跑一次：因為平常只查記憶體快取、不打 DB，頻繁也不燒 Neon；提醒最多晚 5 分鐘。
+cron.schedule('*/5 * * * *', runEventAutomation, { timezone: 'Asia/Taipei' });
 
 // ─── 綁定提醒 ────────────────────────────────────────────────────────────────
 // 寄一封一鍵綁定信給「報名了但 line_user_id 為空 + subscribe_line='yes' + 還沒寄過」的人。
