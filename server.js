@@ -59,8 +59,31 @@ function isEventLive(now = new Date()) {
   return hhmm >= '19:30' && hhmm <= '21:00';
 }
 
+// ─── 維護模式：DB 未就緒時不讓整站空轉，回友善維護頁（503）───────────────────
+// 過去 DB 連不上會 process.exit(1) → Render crash-loop → 整站一直轉。
+// 改成：照常開 port，DB 沒好就回維護頁；背景重試，DB 一復原自動恢復（見檔尾啟動區）。
+let dbReady = false;
+const MAINTENANCE_HTML = `<!doctype html><html lang="zh-Hant"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>系統維護中 — AI 共學聚</title>
+<style>body{margin:0;font-family:-apple-system,"Noto Sans TC",sans-serif;background:#0f1117;color:#e7e9ee;
+display:flex;min-height:100vh;align-items:center;justify-content:center;text-align:center}
+.box{max-width:460px;padding:40px 28px}h1{font-size:1.5rem;margin:0 0 12px}
+p{line-height:1.7;color:#aab0bd;margin:8px 0}.dot{display:inline-block;width:8px;height:8px;border-radius:50%;
+background:#f5a623;margin-right:8px;animation:b 1.2s infinite}@keyframes b{50%{opacity:.3}}</style></head>
+<body><div class="box"><h1><span class="dot"></span>系統維護中</h1>
+<p>網站正在進行短暫維護，稍候將自動恢復。</p>
+<p>造成不便敬請見諒，請過幾分鐘再重新整理。</p>
+<p style="margin-top:24px;font-size:.85rem;color:#6b7280">AI 共學聚 · CosmoSeed</p></div></body></html>`;
+
 const app = express();
 app.use(cors());
+// 維護模式攔截：放在最前面，DB 沒好時直接回維護頁，不進後面任何路由
+app.use((req, res, next) => {
+  if (dbReady) return next();
+  if (req.path === '/webhook') return res.sendStatus(503); // LINE 平台會自行重試
+  res.status(503).set('Retry-After', '120').type('html').send(MAINTENANCE_HTML);
+});
 // /webhook 用 raw body（LINE 簽章驗證需要），其餘用 JSON
 app.use((req, res, next) => {
   if (req.path === '/webhook') return next();
@@ -1139,7 +1162,7 @@ async function sendPostEventSurvey(ev) {
   return result.rows.length;
 }
 
-// ─── 自動化心臟：每分鐘掃 events 表，到點就發 day/hour 提醒、課後問卷補推（取代寫死日期的 cron）──
+// ─── 自動化心臟：每 15 分鐘掃 events 表，到點就發 day/hour 提醒、課後問卷補推（取代寫死日期的 cron）──
 // 冪等：每個動作發完蓋戳記（reminder_day_sent_at / reminder_hour_sent_at / survey_sent_at），不重發。
 async function runEventAutomation() {
   try {
@@ -1186,7 +1209,9 @@ async function runEventAutomation() {
     console.error('[EventAutomation] error:', e.message);
   }
 }
-cron.schedule('* * * * *', runEventAutomation, { timezone: 'Asia/Taipei' });
+// ⚠️ 每 15 分鐘（原本每分鐘）：每分鐘查 DB 會讓 Neon compute 永不休眠、約 8 天燒爆免費額度。
+// 改 15 分鐘 → DB 閒置 >5 分可 scale-to-zero，費用大幅下降；day/hour 提醒最多晚 15 分鐘可接受。
+cron.schedule('*/15 * * * *', runEventAutomation, { timezone: 'Asia/Taipei' });
 
 // ─── 綁定提醒 ────────────────────────────────────────────────────────────────
 // 寄一封一鍵綁定信給「報名了但 line_user_id 為空 + subscribe_line='yes' + 還沒寄過」的人。
@@ -1558,11 +1583,27 @@ app.get('/admin/ecpay-poll', async (req, res) => {
 
 // ─── Start ───────────────────────────────────────────────────────────────────
 const PORT = process.env.PORT || 3000;
-initDB().then(async () => {
+
+// DB 初始化（成功才 dbReady=true）；失敗不再 process.exit，改進維護模式 + 背景重試
+async function tryInitDB() {
+  await initDB();
   const cur = await getCurrentEvent();   // 暖機：解析當前場次（events 表單一真相源）
+  dbReady = true;
   console.log(`   當前場次（events 表）: ${cur.event_date} — ${cur.label}`);
+}
+
+tryInitDB().catch(err => {
+  console.error('⚠️ DB 連線失敗，以「維護模式」啟動（網頁回 503 維護頁，不再整站空轉）:', err.message);
+  // 背景每 30 秒重試，DB 一復原就自動恢復服務，免手動重啟
+  const retry = setInterval(() => {
+    tryInitDB().then(() => {
+      console.log('✅ DB 已恢復，服務恢復正常');
+      clearInterval(retry);
+    }).catch(e => console.error('   DB 重試仍失敗:', e.message));
+  }, 30000);
+}).finally(() => {
   app.listen(PORT, () => {
-    console.log(`🚀 伺服器啟動 port ${PORT}`);
+    console.log(`🚀 伺服器啟動 port ${PORT}${dbReady ? '' : '（⚠️ 維護模式：DB 未就緒）'}`);
     console.log(`   Resend (寄信):     ${resend ? '✅ 已設定' : '❌ RESEND_API_KEY 未設定 — 所有信都會 silent skip'}`);
     console.log(`   Email From:        ${EMAIL_FROM}`);
     console.log(`   LINE Messaging:    ${lineClient ? '✅ 已設定' : '❌ LINE_CHANNEL_ACCESS_TOKEN 未設定'}`);
@@ -1576,7 +1617,4 @@ initDB().then(async () => {
       console.log(`     ↳ ADMIN_LINE_USER_ID: ${ADMIN_LINE_USER_ID ? '✅' : '❌'}`);
     }
   });
-}).catch(err => {
-  console.error('DB 連線失敗:', err.message);
-  process.exit(1);
 });
