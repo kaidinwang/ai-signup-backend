@@ -1114,10 +1114,13 @@ async function sendRemindersForEvent(ev, type = 'day') {
     `SELECT * FROM registrations WHERE attendance IN ('Yes','Maybe') AND event_date=$1`,
     [ev.event_date]
   );
+  // ⚠️ day 提醒不寫死「明天」：若因故遲發（如系統當天才補發）會誤導學員以為改天上課。
+  // 改用場次標籤（含明確日期，如「6/22（一）20:00–21:00 線上」），遲發也不會搞錯。
+  const dateLabel = ev.label || ev.event_date;
   const lineMsg = type === 'hour'
     ? `⏰ 今晚就要開始囉！\n\nAI 共學聚今晚 20:00–21:00 線上見 🚀\n📌 主題：${ev.topic}\n\n💻 Meet 連結：\n${ev.meet_url}\n\n🔔 19:50 開放進入教室、20:00 準時開始\n\n📋 記得準備：\n${ev.prep}\n\n晚點見！🧬`
-    : `📅 明天提醒！\n\nAI 共學聚明天晚上 20:00–21:00\n📌 主題：${ev.topic}\n\n💻 Meet 連結：\n${ev.meet_url}\n\n期待明天和大家共學！🧬`;
-  const emailSubject = type === 'hour' ? '⏰ AI 共學聚今晚 20:00 開始！' : '📅 明天提醒：AI 共學聚';
+    : `📅 上課提醒！\n\nAI 共學聚 ${dateLabel}\n📌 主題：${ev.topic}\n\n💻 Meet 連結：\n${ev.meet_url}\n\n期待和大家一起共學！🧬`;
+  const emailSubject = type === 'hour' ? '⏰ AI 共學聚今晚 20:00 開始！' : `📅 上課提醒：AI 共學聚 ${dateLabel}`;
 
   for (const reg of result.rows) {
     if (reg.line_user_id) {
@@ -1146,6 +1149,59 @@ async function sendReminders(type = 'day') {
   const ev = await getCurrentEvent();
   return sendRemindersForEvent(ev, type);
 }
+
+// 一次性「更正」廣播：因遲發的 day 提醒誤寫「明天」，發更正告知今天上課。
+// 用法（瀏覽器直接開）：
+//   先預覽人數： https://event.cosmoseed.com.tw/admin/api/send-correction?pw=後台密碼&dry=1
+//   實際發送：   https://event.cosmoseed.com.tw/admin/api/send-correction?pw=後台密碼
+// 對象與提醒完全一致：本場 Yes/Maybe 報名者 + 外部 LINE 綁定者。
+app.get('/admin/api/send-correction', adminAuth, async (req, res) => {
+  try {
+    const dry = req.query.dry === '1';
+    const ev = mergeEventDefaults(await getCurrentEvent());
+    const dateLabel = ev.label || ev.event_date;
+    const msg = `🔔 更正通知（剛剛的訊息誤寫成「明天」，抱歉造成困擾 🙏）\n\n`
+      + `✅ 正確上課時間是【今天】${dateLabel}\n`
+      + `AI 共學聚就在今晚 20:00–21:00 線上開始，不是明天喔！\n\n`
+      + `📌 主題：${ev.topic}\n\n💻 Meet 連結：\n${ev.meet_url}\n\n今晚見！🧬`;
+    const subject = `🔔 更正：AI 共學聚是「今晚」（${ev.event_date}）20:00，不是明天`;
+
+    const regs = await pool.query(
+      `SELECT * FROM registrations WHERE attendance IN ('Yes','Maybe') AND event_date=$1`,
+      [ev.event_date]
+    );
+    let lineSent = 0, emailSent = 0;
+    if (!dry) {
+      for (const reg of regs.rows) {
+        if (reg.line_user_id) { await sendLine(reg.line_user_id, `嗨 ${reg.name}！\n\n${msg}`); lineSent++; }
+        else { await sendEmail(reg.email, subject, `嗨 ${reg.name}！\n\n${msg}\n\n— AI 共學聚團隊 🧬`); emailSent++; }
+      }
+    } else {
+      for (const reg of regs.rows) { if (reg.line_user_id) lineSent++; else emailSent++; }
+    }
+
+    const ext = await pool.query(`
+      SELECT lb.line_user_id, lb.display_name
+      FROM line_bindings lb
+      LEFT JOIN registrations r ON lb.email = r.email
+      WHERE r.id IS NULL AND lb.line_user_id IS NOT NULL
+    `);
+    if (!dry) {
+      for (const b of ext.rows) {
+        await sendLine(b.line_user_id, `${b.display_name ? `嗨 ${b.display_name}！\n\n` : '嗨！\n\n'}${msg}`);
+        lineSent++;
+      }
+    } else {
+      lineSent += ext.rows.length;
+    }
+
+    console.log(`[Correction] ${dry ? '(dry-run) ' : ''}event=${ev.event_date} line=${lineSent} email=${emailSent}`);
+    res.json({ success: true, dryRun: dry, event: ev.event_date, lineSent, emailSent, preview: msg });
+  } catch (e) {
+    console.error('[Correction Error]', e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
 
 // 課後問卷自動補推：寄給該場 Yes/Maybe 但「沒報到」的人（attended 為 TRUE 的人會走簡報+問卷信，不重複）。
 async function sendPostEventSurvey(ev) {
