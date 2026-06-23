@@ -619,7 +619,7 @@
           "name": "下一場 AI 共學聚是什麼時候？主題是什麼？",
           "acceptedAnswer": {
             "@type": "Answer",
-            "text": "下一場是 2026/6/22（週一）20:00–21:00 線上直播，主題是「一人公司品牌內容實戰！用 ChatGPT 快速打造你的內容系統」，由 Din Din Wang 王宣方主講。報名請至 https://event.cosmoseed.com.tw/register。"
+            "text": "AI 共學聚每月兩次、週一晚上 20:00 線上直播。下一場的日期與主題會公布在課程頁 https://event.cosmoseed.com.tw/courses 的「下一場」區塊與報名頁 https://event.cosmoseed.com.tw/register；想第一時間收到開課通知可加入官方 LINE。"
           }
         },
         {
@@ -651,7 +651,7 @@
           "name": "什麼是「一人公司的內容系統」？這堂課會學到什麼？",
           "acceptedAnswer": {
             "@type": "Answer",
-            "text": "內容系統指的是用 AI 把「市場定位 → 品牌企劃 → 內容產製 → 視覺生成」串成一條可重複運作的流程，讓一個人也能穩定產出行銷內容。AI 共學聚 6/22 場次會帶你用 ChatGPT 與 NotebookLM 實作：AI 市場研究與競品分析、RACI 黃金指令、Threads 爆文與 IG 文案生成、AI 生圖一致性技巧，沒團隊、不懂行銷也能上手，全程不寫程式。"
+            "text": "內容系統指的是用 AI 把「市場定位 → 品牌企劃 → 內容產製 → 視覺生成」串成一條可重複運作的流程，讓一個人也能穩定產出行銷內容。AI 共學聚「一人公司品牌內容實戰」場次帶學員用 ChatGPT 與 NotebookLM 實作：AI 市場研究與競品分析、RACI 黃金指令、Threads 爆文與 IG 文案生成、AI 生圖一致性技巧，沒團隊、不懂行銷也能上手，全程不寫程式。"
           }
         }
       ]
@@ -709,7 +709,7 @@
         </p>
     </header>
 
-    <!-- 進行中 -->
+    <!-- 下一場 -->
     <section>
         <div class="section-header live">
             <span class="section-icon"><i class="fas fa-bolt"></i></span>
@@ -719,42 +719,24 @@
             </div>
         </div>
 
-        <a href="/register" class="course-card glass-card live block">
-            <div class="course-banner">
-                <img src="/banner.png" alt="6/22 AI 共學聚 — 一人公司品牌內容實戰！用 ChatGPT 快速打造你的內容系統" loading="lazy">
-            </div>
-            <div class="p-6 md:p-7 space-y-5">
-                <div class="flex items-start justify-between gap-3 flex-wrap">
-                    <div class="date-stamp">
-                        <span class="big">6/22</span>
-                        <span class="meta">2026<br>週一 · 20:00–21:00</span>
-                    </div>
-                    <span class="badge badge-live"><i class="fas fa-bolt"></i> 報名中</span>
-                </div>
-                <div>
-                    <h3 class="display-font text-xl md:text-2xl font-bold text-white leading-snug mb-2">
-                        一人公司品牌內容實戰！<br>用 ChatGPT 快速打造你的內容系統
-                    </h3>
-                    <p class="text-slate-300 text-[14px] leading-relaxed">
-                        沒團隊、不懂行銷也能賣！用 ChatGPT 與 NotebookLM 打造內容系統：市場定位、品牌企劃、Threads 爆文、IG 文案到 AI 生圖一致性，新手也能上手。
-                    </p>
-                </div>
-                <div class="flex items-center gap-2 flex-wrap">
-                    <span class="text-xs uppercase tracking-wider text-slate-500 font-semibold mr-1">主講</span>
-                    <span class="lecturer-pill">
-                        <img src="/dindin.jpg" alt="Din Din Wang"
-                             onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
-                        <span class="fallback" style="display:none;">DD</span>
-                        王宣方 Din Din Wang
-                    </span>
-                </div>
-                <div class="pt-2">
-                    <span class="cta-btn w-full">
-                        <span>立即報名</span> <span class="arrow">→</span>
-                    </span>
+        <!-- DYN:NEXT:START 由 server.js 依 events 表動態填入：有開放報名場次→報名卡；無→籌備中卡。下方為 DB 不可用時的安全 fallback。 -->
+        <div class="course-card glass-card block">
+            <div class="p-6 md:p-7 space-y-4 text-center">
+                <span class="badge badge-done"><i class="fas fa-hourglass-half text-[10px]"></i> 籌備中</span>
+                <h3 class="display-font text-xl md:text-2xl font-bold text-white leading-snug">
+                    下一場正在籌備中 🌱
+                </h3>
+                <p class="text-slate-300 text-[14px] leading-relaxed">
+                    AI 共學聚每月兩次。下一場主題與日期正在規劃中，加入官方 LINE 搶先收到開課通知，不錯過報名。
+                </p>
+                <div class="pt-1">
+                    <a href="https://lin.ee/RBotXBl" target="_blank" rel="noopener" class="cta-btn w-full">
+                        <span>加入 LINE 收開課通知</span> <span class="arrow">→</span>
+                    </a>
                 </div>
             </div>
-        </a>
+        </div>
+        <!-- DYN:NEXT:END -->
     </section>
 
     <!-- 過去課程 -->
@@ -764,6 +746,41 @@
             <div>
                 <div class="section-label">PAST</div>
                 <div class="section-title">過去課程</div>
+            </div>
+        </div>
+
+        <!-- DYN:PAST:START 由 server.js 依 events 表（event_date < 今天）動態填入。下方為 DB 不可用時的安全 fallback。 -->
+
+        <!-- 6/22 已結束 -->
+        <div class="course-card glass-card block">
+            <div class="course-banner past">
+                <img src="/banner-0622.png" alt="6/22 AI 共學聚 — 一人公司品牌內容實戰！用 ChatGPT 快速打造你的內容系統" loading="lazy">
+            </div>
+            <div class="p-6 md:p-7 space-y-5">
+                <div class="flex items-start justify-between gap-3 flex-wrap">
+                    <div class="date-stamp">
+                        <span class="big" style="color:#94a3b8;">6/22</span>
+                        <span class="meta">2026<br>週一 · 20:00–21:00</span>
+                    </div>
+                    <span class="badge badge-done"><i class="fas fa-check text-[10px]"></i> 已結束</span>
+                </div>
+                <div>
+                    <h3 class="display-font text-xl font-bold text-slate-100 leading-snug mb-2">
+                        一人公司品牌內容實戰！用 ChatGPT 快速打造你的內容系統
+                    </h3>
+                    <p class="text-slate-400 text-[14px] leading-relaxed">
+                        沒團隊、不懂行銷也能賣！用 ChatGPT 與 NotebookLM 打造內容系統：市場定位、品牌企劃、Threads 爆文、IG 文案到 AI 生圖一致性，新手也能上手。
+                    </p>
+                </div>
+                <div class="flex items-center gap-2 flex-wrap">
+                    <span class="text-xs uppercase tracking-wider text-slate-500 font-semibold mr-1">講師</span>
+                    <span class="lecturer-pill">
+                        <img src="/dindin.jpg" alt="Din Din Wang"
+                             onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
+                        <span class="fallback" style="display:none;">DD</span>
+                        王宣方 Din Din Wang
+                    </span>
+                </div>
             </div>
         </div>
 
@@ -869,6 +886,7 @@
                 </div>
             </div>
         </div>
+        <!-- DYN:PAST:END -->
     </section>
 
     <!-- About CosmoSeed -->
@@ -965,7 +983,7 @@
             </details>
             <details class="faq-item">
                 <summary>下一場是什麼時候？主題是什麼？</summary>
-                <div class="faq-answer">下一場是 <span class="font-semibold text-white">2026/6/22（週一）20:00–21:00</span> 線上直播，主題：<span class="font-semibold text-pink-200">一人公司品牌內容實戰！用 ChatGPT 快速打造你的內容系統</span>，由 Din Din Wang 王宣方主講。報名請至 <a href="https://event.cosmoseed.com.tw/register" class="text-purple-300 underline hover:text-purple-200">event.cosmoseed.com.tw/register</a>。</div>
+                <div class="faq-answer">AI 共學聚 <span class="font-semibold text-white">每月兩次、週一晚上 20:00</span> 線上直播。下一場的日期與主題會公布在本頁最上方的「下一場」區塊與 <a href="https://event.cosmoseed.com.tw/register" class="text-purple-300 underline hover:text-purple-200">報名頁</a>；想第一時間收到開課通知，可加入官方 LINE。</div>
             </details>
             <details class="faq-item">
                 <summary>誰是 AI 共學聚的講師？</summary>
@@ -981,7 +999,7 @@
             </details>
             <details class="faq-item">
                 <summary>什麼是「一人公司的內容系統」？這堂課會學到什麼？</summary>
-                <div class="faq-answer"><span class="font-semibold text-white">內容系統</span>是用 AI 把「市場定位 → 品牌企劃 → 內容產製 → 視覺生成」串成一條可重複運作的流程，讓一個人也能穩定產出行銷內容。AI 共學聚 6/22 場次會帶你用 <span class="font-semibold text-white">ChatGPT 與 NotebookLM</span> 實作：AI 市場研究與競品分析、RACI 黃金指令、Threads 爆文與 IG 文案生成、AI 生圖一致性技巧，沒團隊、不懂行銷也能上手，全程不寫程式。</div>
+                <div class="faq-answer"><span class="font-semibold text-white">內容系統</span>是用 AI 把「市場定位 → 品牌企劃 → 內容產製 → 視覺生成」串成一條可重複運作的流程，讓一個人也能穩定產出行銷內容。AI 共學聚「一人公司品牌內容實戰」場次帶學員用 <span class="font-semibold text-white">ChatGPT 與 NotebookLM</span> 實作：AI 市場研究與競品分析、RACI 黃金指令、Threads 爆文與 IG 文案生成、AI 生圖一致性技巧，沒團隊、不懂行銷也能上手，全程不寫程式。</div>
             </details>
         </div>
     </section>

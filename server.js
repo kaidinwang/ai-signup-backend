@@ -114,7 +114,31 @@ app.use((req, res, next) => {
 // 根目錄改導向課程列表頁（5/18 後預設行為）
 // 想直接看舊報名表單請走 /register
 app.get('/', (req, res) => res.redirect(302, '/courses'));
-app.get('/register', (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
+// 報名頁：沒有開放報名的場次時導回課程頁（顯示「籌備中」），避免看到過期場次的舊報名表單。
+app.get('/register', async (req, res) => {
+  const open = await getOpenEvent();
+  if (!open) return res.redirect(302, '/courses');
+  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
+
+// 課程頁：從 events 表動態渲染「下一場 / 過去課程」卡，過期場次自動歸檔、沒開放場次顯示籌備中。
+// 任何錯誤或 DB 無資料 → 直接吐靜態 courses.html（其內容已維持為「當下安全狀態」）。
+app.get('/courses', async (req, res) => {
+  try {
+    let html = coursesTemplate();
+    const today = taipeiToday();
+    const [open, events] = await Promise.all([getOpenEvent(), getPublicEvents()]);
+    if (events) {
+      html = fillDynBlock(html, 'NEXT', open ? renderNextCard(open) : renderComingSoonCard());
+      const past = events.filter(e => e.event_date < today && (!open || e.event_date !== open.event_date));
+      if (past.length) html = fillDynBlock(html, 'PAST', past.map(renderPastCard).join('\n        '));
+    }
+    res.type('html').send(html);
+  } catch (e) {
+    console.error('[courses] dynamic render fail, serving static:', e.message);
+    res.sendFile(path.join(__dirname, 'public', 'courses.html'));
+  }
+});
 
 app.use(express.static(path.join(__dirname, 'public'), { extensions: ['html'] }));
 
@@ -266,6 +290,28 @@ async function initDB() {
     ON CONFLICT (event_date) DO NOTHING
   `);
 
+  // ─── courses.html 卡片渲染欄位（讓 /courses 能從 events 表動態產生「下一場 / 過去課程」卡，過期自動歸檔）
+  await pool.query(`ALTER TABLE events ADD COLUMN IF NOT EXISTS lecturer TEXT`);        // 講師顯示名，例：王宣方 Din Din Wang
+  await pool.query(`ALTER TABLE events ADD COLUMN IF NOT EXISTS lecturer_img TEXT`);    // 講師頭像路徑，例：/dindin.jpg
+  await pool.query(`ALTER TABLE events ADD COLUMN IF NOT EXISTS blurb TEXT`);           // 卡片短描述（行銷文案）
+  await pool.query(`ALTER TABLE events ADD COLUMN IF NOT EXISTS signups INTEGER`);      // 過去場：報名數（選填，顯示 stat tag）
+  await pool.query(`ALTER TABLE events ADD COLUMN IF NOT EXISTS attended_count INTEGER`); // 過去場：出席數（選填）
+  // 一次性 backfill：只在欄位仍為 NULL 時填（避免覆蓋後台日後手動編輯）。
+  const seedCard = async (date, lecturer, img, blurb, signups = null, attended = null) =>
+    pool.query(
+      `UPDATE events SET lecturer=$2, lecturer_img=$3, blurb=$4, signups=$5, attended_count=$6
+       WHERE event_date=$1 AND lecturer IS NULL`,
+      [date, lecturer, img, blurb, signups, attended]
+    );
+  await seedCard('2026-05-04', '阿邦老師', '/abang.jpg',
+    '從 Gmail、Google 雲端硬碟到 Gem 自動化機器人，掌握 Gemini 在工作與生活上的實戰應用。', 189, 101);
+  await seedCard('2026-05-18', '王宣方 Din Din Wang', '/dindin.jpg',
+    '小白也能快速做出精美社群內容。涵蓋 Claude Projects 入門、AI 輪播貼文實戰、Claude Skills × AI 工作流。');
+  await seedCard('2026-06-01', '阿邦老師', '/abang.jpg',
+    'Gemini Canvas 實作課：自然語言生成 AI 簡報、互動式旅遊小工具，不需設計或程式背景。');
+  await seedCard('2026-06-22', '王宣方 Din Din Wang', '/dindin.jpg',
+    '沒團隊、不懂行銷也能賣！用 ChatGPT 與 NotebookLM 打造內容系統：市場定位、品牌企劃、Threads 爆文、IG 文案到 AI 生圖一致性，新手也能上手。');
+
   console.log('DB ready');
 }
 
@@ -341,11 +387,177 @@ async function getCurrentEvent() {
 }
 
 // 場次異動（上架/取消/建立）後呼叫，讓下一次 getCurrentEvent 立即重算。
-function invalidateCurrentEvent() { _currentEventCachedAt = 0; _eventListCache = null; }
+function invalidateCurrentEvent() {
+  _currentEventCachedAt = 0;
+  _eventListCache = null;
+  _openEventCache = { v: undefined, at: 0 };
+  _publicEventsCache = { v: undefined, at: 0 };
+}
 
 // 同步存取點（給少數同步函式如 isEventLive 用）：回最後一次解析結果，未解析過退 env。
 function currentEventSync() {
   return _currentEventCache || mergeEventDefaults({ event_date: CURRENT_EVENT_DATE });
+}
+
+// ─── 開放報名場次 + 公開場次清單（/courses 動態渲染、報名擋關用）──────────────
+// getCurrentEvent() 在「沒有未來場」時會退回最近的過去場（給課後信/問卷用），
+// 但「能不能報名」要的是嚴格的「今天/未來 且 已上架」——過了就沒有開放場次 → 報名關閉。
+let _openEventCache = { v: undefined, at: 0 };
+let _publicEventsCache = { v: undefined, at: 0 };
+
+// 目前開放報名的場次：status='published' 且 event_date >= 今天，取最近一場；沒有則 null。
+async function getOpenEvent() {
+  const now = Date.now();
+  if (_openEventCache.v !== undefined && now - _openEventCache.at < 60000) return _openEventCache.v;
+  let result = null;
+  try {
+    const r = await pool.query(
+      `SELECT * FROM events WHERE status='published' AND event_date >= $1
+       ORDER BY event_date ASC LIMIT 1`,
+      [taipeiToday()]
+    );
+    result = r.rows[0] ? mergeEventDefaults(r.rows[0]) : null;
+  } catch (e) {
+    console.error('[events] getOpenEvent fail:', e.message);
+    result = null;
+  }
+  _openEventCache = { v: result, at: now };
+  return result;
+}
+
+// 對外可見的場次（已上架或已結束），最新在前。draft / cancelled 不顯示。
+async function getPublicEvents() {
+  const now = Date.now();
+  if (_publicEventsCache.v !== undefined && now - _publicEventsCache.at < 60000) return _publicEventsCache.v;
+  let rows = null;
+  try {
+    const r = await pool.query(
+      `SELECT * FROM events WHERE status IN ('published','past') ORDER BY event_date DESC`
+    );
+    rows = r.rows.map(mergeEventDefaults);
+  } catch (e) {
+    console.error('[events] getPublicEvents fail:', e.message);
+    rows = null;  // null → 呼叫端沿用靜態 fallback
+  }
+  _publicEventsCache = { v: rows, at: now };
+  return rows;
+}
+
+// ─── /courses 卡片 HTML 產生器（與 courses.html 既有 class 結構一致）────────────
+function escHtml(s) {
+  return String(s == null ? '' : s).replace(/[&<>"]/g, c =>
+    ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+}
+// 'YYYY-MM-DD' → { big:'6/22', year:'2026', weekday:'週一' }
+function eventDateParts(dateStr) {
+  const [y, m, d] = dateStr.split('-');
+  const dt = new Date(`${dateStr}T12:00:00+08:00`);
+  const weekday = dt.toLocaleDateString('zh-TW', { timeZone: 'Asia/Taipei', weekday: 'short' });
+  return { big: `${Number(m)}/${Number(d)}`, year: y, weekday };
+}
+function eventTimeRange(ev) {
+  const fmt = t => new Date(t).toLocaleTimeString('en-GB',
+    { timeZone: 'Asia/Taipei', hour: '2-digit', minute: '2-digit', hour12: false });
+  if (!ev.start_at) return '';
+  return ev.end_at ? `${fmt(ev.start_at)}–${fmt(ev.end_at)}` : fmt(ev.start_at);
+}
+function lecturerPill(ev) {
+  const name = ev.lecturer || '王宣方 Din Din Wang';
+  const img = ev.lecturer_img || '/dindin.jpg';
+  const isAbang = /abang/i.test(img) || name.includes('阿邦');
+  const fb = isAbang ? '阿' : 'DD';
+  const fbStyle = isAbang ? 'background:linear-gradient(135deg,#8b5cf6,#3b82f6);' : '';
+  return `<span class="lecturer-pill">
+                        <img src="${escHtml(img)}" alt="${escHtml(name)}"
+                             onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
+                        <span class="fallback" style="display:none;${fbStyle}">${fb}</span>
+                        ${escHtml(name)}
+                    </span>`;
+}
+function renderNextCard(ev) {
+  const { big, year, weekday } = eventDateParts(ev.event_date);
+  const meta = `${year}<br>${weekday} · ${eventTimeRange(ev)}`;
+  return `<a href="/register" class="course-card glass-card live block">
+            <div class="course-banner">
+                <img src="${escHtml(ev.banner || '/banner.png')}" alt="${escHtml(ev.title)} — ${escHtml(ev.topic)}" loading="lazy">
+            </div>
+            <div class="p-6 md:p-7 space-y-5">
+                <div class="flex items-start justify-between gap-3 flex-wrap">
+                    <div class="date-stamp">
+                        <span class="big">${big}</span>
+                        <span class="meta">${meta}</span>
+                    </div>
+                    <span class="badge badge-live"><i class="fas fa-bolt"></i> 報名中</span>
+                </div>
+                <div>
+                    <h3 class="display-font text-xl md:text-2xl font-bold text-white leading-snug mb-2">${escHtml(ev.topic)}</h3>
+                    <p class="text-slate-300 text-[14px] leading-relaxed">${escHtml(ev.blurb || '')}</p>
+                </div>
+                <div class="flex items-center gap-2 flex-wrap">
+                    <span class="text-xs uppercase tracking-wider text-slate-500 font-semibold mr-1">主講</span>
+                    ${lecturerPill(ev)}
+                </div>
+                <div class="pt-2">
+                    <span class="cta-btn w-full"><span>立即報名</span> <span class="arrow">→</span></span>
+                </div>
+            </div>
+        </a>`;
+}
+function renderComingSoonCard() {
+  return `<div class="course-card glass-card block">
+            <div class="p-6 md:p-7 space-y-4 text-center">
+                <span class="badge badge-done"><i class="fas fa-hourglass-half text-[10px]"></i> 籌備中</span>
+                <h3 class="display-font text-xl md:text-2xl font-bold text-white leading-snug">下一場正在籌備中 🌱</h3>
+                <p class="text-slate-300 text-[14px] leading-relaxed">AI 共學聚每月兩次。下一場主題與日期正在規劃中，加入官方 LINE 搶先收到開課通知，不錯過報名。</p>
+                <div class="pt-1">
+                    <a href="https://lin.ee/RBotXBl" target="_blank" rel="noopener" class="cta-btn w-full"><span>加入 LINE 收開課通知</span> <span class="arrow">→</span></a>
+                </div>
+            </div>
+        </div>`;
+}
+function renderPastCard(ev) {
+  const { big, year, weekday } = eventDateParts(ev.event_date);
+  const meta = `${year}<br>${weekday} · ${eventTimeRange(ev)}`;
+  const stats = (ev.signups != null || ev.attended_count != null) ? `
+                <div class="flex items-center gap-2 flex-wrap pt-1">
+                    ${ev.signups != null ? `<span class="stat-tag"><i class="fas fa-users text-[10px]"></i> ${ev.signups} 報名</span>` : ''}
+                    ${ev.attended_count != null ? `<span class="stat-tag" style="background:rgba(56,189,248,0.1);border-color:rgba(56,189,248,0.2);color:#7dd3fc;"><i class="fas fa-video text-[10px]"></i> ${ev.attended_count} 出席</span>` : ''}
+                </div>` : '';
+  return `<div class="course-card glass-card block">
+            <div class="course-banner past">
+                <img src="${escHtml(ev.banner || '/banner.png')}" alt="${escHtml(ev.title)} — ${escHtml(ev.topic)}" loading="lazy">
+            </div>
+            <div class="p-6 md:p-7 space-y-5">
+                <div class="flex items-start justify-between gap-3 flex-wrap">
+                    <div class="date-stamp">
+                        <span class="big" style="color:#94a3b8;">${big}</span>
+                        <span class="meta">${meta}</span>
+                    </div>
+                    <span class="badge badge-done"><i class="fas fa-check text-[10px]"></i> 已結束</span>
+                </div>
+                <div>
+                    <h3 class="display-font text-xl font-bold text-slate-100 leading-snug mb-2">${escHtml(ev.topic)}</h3>
+                    <p class="text-slate-400 text-[14px] leading-relaxed">${escHtml(ev.blurb || '')}</p>
+                </div>
+                <div class="flex items-center gap-2 flex-wrap">
+                    <span class="text-xs uppercase tracking-wider text-slate-500 font-semibold mr-1">講師</span>
+                    ${lecturerPill(ev)}
+                </div>${stats}
+            </div>
+        </div>`;
+}
+
+// courses.html 模板（讀一次存記憶體；DYN 標記區由 events 表動態填入）
+let _coursesTemplate = null;
+function coursesTemplate() {
+  if (_coursesTemplate == null) {
+    _coursesTemplate = fs.readFileSync(path.join(__dirname, 'public', 'courses.html'), 'utf8');
+  }
+  return _coursesTemplate;
+}
+function fillDynBlock(html, name, inner) {
+  const re = new RegExp(`<!-- DYN:${name}:START[\\s\\S]*?DYN:${name}:END -->`);
+  return html.replace(re, `<!-- DYN:${name}:START -->\n${inner}\n        <!-- DYN:${name}:END -->`);
 }
 
 // ─── LINE Client ─────────────────────────────────────────────────────────────
@@ -415,8 +627,9 @@ function buildBindReminderEmail(name, email, ev) {
 app.get('/check-email', async (req, res) => {
   const email = (req.query.email || '').trim().toLowerCase();
   if (!email) return res.json({ registered: false });
-  // 只檢查當前場次：之前場次報過不算重複
-  const ev = await getCurrentEvent();
+  // 只檢查「開放報名中」的場次：沒有開放場次 → 回 closed，前端不再讓人送出
+  const ev = await getOpenEvent();
+  if (!ev) return res.json({ registered: false, closed: true });
   const result = await pool.query(
     'SELECT name, attendance FROM registrations WHERE email=$1 AND event_date=$2',
     [email, ev.event_date]
@@ -442,7 +655,15 @@ app.post('/register', async (req, res) => {
     return res.status(400).json({ success: false, message: '姓名和 Email 為必填' });
   }
 
-  const ev = await getCurrentEvent();
+  // 報名擋關：只接受「今天/未來 且 已上架」的場次。場次過了又沒上架下一場 → 報名關閉。
+  const ev = await getOpenEvent();
+  if (!ev) {
+    return res.json({
+      success: false,
+      closed: true,
+      message: '目前沒有開放報名的場次 🌱 下一場籌備中，加入官方 LINE（lin.ee/RBotXBl）搶先收到開課通知！',
+    });
+  }
 
   // 防呆：已報名直接回傳提示（只檢查當前場次，跨場次允許再報一次）
   const existing = await pool.query(
@@ -965,9 +1186,10 @@ app.post('/admin/api/events', adminAuth, async (req, res) => {
       INSERT INTO events
         (event_date, title, topic, label, prep, meet_url, banner, start_at, end_at,
          registration_open_at, survey_url, reminder_day_offset_min, reminder_hour_offset_min,
-         survey_offset_min, status)
+         survey_offset_min, status, lecturer, lecturer_img, blurb)
       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,
-              COALESCE($12,1440), COALESCE($13,90), COALESCE($14,720), COALESCE($15,'draft'))
+              COALESCE($12,1440), COALESCE($13,90), COALESCE($14,720), COALESCE($15,'draft'),
+              $16,$17,$18)
       ON CONFLICT (event_date) DO UPDATE SET
         title=EXCLUDED.title, topic=EXCLUDED.topic, label=EXCLUDED.label, prep=EXCLUDED.prep,
         meet_url=EXCLUDED.meet_url, banner=EXCLUDED.banner, start_at=EXCLUDED.start_at,
@@ -976,12 +1198,15 @@ app.post('/admin/api/events', adminAuth, async (req, res) => {
         reminder_day_offset_min=EXCLUDED.reminder_day_offset_min,
         reminder_hour_offset_min=EXCLUDED.reminder_hour_offset_min,
         survey_offset_min=EXCLUDED.survey_offset_min,
-        status=EXCLUDED.status
+        status=EXCLUDED.status,
+        lecturer=COALESCE(EXCLUDED.lecturer, events.lecturer),
+        lecturer_img=COALESCE(EXCLUDED.lecturer_img, events.lecturer_img),
+        blurb=COALESCE(EXCLUDED.blurb, events.blurb)
       RETURNING *
     `, [event_date, b.title, b.topic, b.label || null, b.prep || null, b.meet_url || null,
         b.banner || null, b.start_at, b.end_at || null, b.registration_open_at || null,
         b.survey_url || null, b.reminder_day_offset_min, b.reminder_hour_offset_min,
-        b.survey_offset_min, b.status]);
+        b.survey_offset_min, b.status, b.lecturer || null, b.lecturer_img || null, b.blurb || null]);
     invalidateCurrentEvent();   // 場次內容/狀態變了 → 下次 getCurrentEvent 立即重算
     res.json({ success: true, event: result.rows[0] });
   } catch (err) {

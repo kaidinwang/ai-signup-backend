@@ -122,6 +122,30 @@
 
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <label class="text-sm space-y-1">
+                        <span class="text-slate-400">講師（顯示在課程頁卡片）</span>
+                        <input id="evLecturer" type="text" list="lecturerSuggestions" placeholder="王宣方 Din Din Wang" class="w-full p-2 rounded-lg bg-slate-800 border border-white/10 text-white">
+                        <datalist id="lecturerSuggestions">
+                            <option value="王宣方 Din Din Wang">
+                            <option value="阿邦老師">
+                        </datalist>
+                    </label>
+                    <label class="text-sm space-y-1">
+                        <span class="text-slate-400">講師頭像（/dindin.jpg 或 /abang.jpg）</span>
+                        <input id="evLecturerImg" type="text" list="lecturerImgSuggestions" placeholder="/dindin.jpg" class="w-full p-2 rounded-lg bg-slate-800 border border-white/10 text-white">
+                        <datalist id="lecturerImgSuggestions">
+                            <option value="/dindin.jpg">
+                            <option value="/abang.jpg">
+                        </datalist>
+                    </label>
+                </div>
+
+                <label class="text-sm space-y-1 block">
+                    <span class="text-slate-400">卡片短描述 blurb（顯示在課程頁「下一場 / 過去課程」卡）</span>
+                    <textarea id="evBlurb" rows="2" placeholder="一句話介紹這堂課會學到什麼，吸引人報名" class="w-full p-2 rounded-lg bg-slate-800 border border-white/10 text-white"></textarea>
+                </label>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <label class="text-sm space-y-1">
                         <span class="text-slate-400">課後問卷連結 survey_url</span>
                         <input id="evSurvey" type="text" placeholder="https://forms.gle/..." class="w-full p-2 rounded-lg bg-slate-800 border border-white/10 text-white">
                     </label>
@@ -654,6 +678,9 @@ async function saveEvent(publish) {
         prep: document.getElementById('evPrep').value.trim() || null,
         meet_url: document.getElementById('evMeet').value.trim() || null,
         banner: document.getElementById('evBanner').value.trim() || null,
+        lecturer: document.getElementById('evLecturer').value.trim() || null,
+        lecturer_img: document.getElementById('evLecturerImg').value.trim() || null,
+        blurb: document.getElementById('evBlurb').value.trim() || null,
         start_at: `${date}T${start}:00+08:00`,
         end_at: end ? `${date}T${end}:00+08:00` : null,
         survey_url: document.getElementById('evSurvey').value.trim() || null,
@@ -744,6 +771,9 @@ function editEvent(date) {
     document.getElementById('evPrep').value = e.prep || '';
     document.getElementById('evSurvey').value = e.survey_url || '';
     document.getElementById('evBanner').value = e.banner || '';
+    document.getElementById('evLecturer').value = e.lecturer || '';
+    document.getElementById('evLecturerImg').value = e.lecturer_img || '';
+    document.getElementById('evBlurb').value = e.blurb || '';
     document.getElementById('evStart').value = toHHMM(e.start_at);
     document.getElementById('evEnd').value = toHHMM(e.end_at);
     document.getElementById('evDayOff').value = e.reminder_day_offset_min ?? '';
