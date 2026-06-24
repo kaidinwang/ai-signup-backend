@@ -203,6 +203,50 @@
         </div>
     </div>
 
+    <!-- 部落格管理 -->
+    <div class="glass rounded-2xl overflow-hidden">
+        <button onclick="toggleBlogPanel()" class="w-full flex items-center justify-between p-4 text-left hover:bg-white/5 transition-all">
+            <span class="font-bold text-lg">📝 部落格管理 — cosmoseed.com.tw/blog</span>
+            <span class="text-slate-400 text-sm"><span id="blogPanelHint">編輯草稿、上架／下架文章</span> <i id="blogPanelChevron" class="fas fa-chevron-down ml-2"></i></span>
+        </button>
+        <div id="blogPanel" class="hidden p-5 pt-0 space-y-5">
+
+            <!-- 編輯器 -->
+            <div id="blogEditor" class="hidden bg-slate-900/50 rounded-xl p-5 space-y-4">
+                <div class="flex items-center justify-between">
+                    <h3 class="font-semibold text-slate-200" id="blogEditorTitle">✏️ 編輯文章</h3>
+                    <button onclick="closeBlogEditor()" class="text-xs text-slate-400 hover:text-slate-200">關閉編輯器</button>
+                </div>
+                <label class="text-sm space-y-1 block">
+                    <span class="text-slate-400">slug（網址，只能小寫英數與連字號，例：2026-06-24-my-post）</span>
+                    <input id="blogSlug" type="text" placeholder="2026-06-24-my-post" class="w-full p-2 rounded-lg bg-slate-800 border border-white/10 text-white font-mono text-sm">
+                </label>
+                <label class="text-sm space-y-1 block">
+                    <span class="text-slate-400">Markdown 內容（含 frontmatter）</span>
+                    <textarea id="blogContent" rows="22" spellcheck="false" class="w-full p-3 rounded-lg bg-slate-800 border border-white/10 text-white font-mono text-xs leading-relaxed"></textarea>
+                </label>
+                <div class="flex items-center gap-3 flex-wrap">
+                    <button onclick="saveBlogPost()" class="px-5 py-2.5 bg-blue-600 hover:bg-blue-500 rounded-xl font-bold transition-all flex items-center gap-2"><i class="fas fa-save"></i> 儲存</button>
+                    <span id="blogSaveMsg" class="text-sm"></span>
+                </div>
+                <p class="text-xs text-slate-500 leading-relaxed">📌 儲存後 commit 到 GitHub，Netlify 自動 rebuild（約 1 分鐘）。新文章建議 frontmatter 設 <code>draft: true</code>（先存草稿），在下方列表確認後再「上架」。下架不刪檔，只是把文章從網站隱藏。</p>
+            </div>
+
+            <button onclick="newBlogDraft()" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 rounded-xl text-sm font-medium transition-all flex items-center gap-2 w-max"><i class="fas fa-plus"></i> 新增草稿</button>
+
+            <!-- 文章列表 -->
+            <div>
+                <h3 class="font-semibold text-slate-300 text-sm uppercase tracking-wide mb-3">📋 所有文章</h3>
+                <div class="overflow-x-auto rounded-xl border border-white/5">
+                    <table>
+                        <thead><tr><th>標題</th><th>日期</th><th>分類</th><th>狀態</th><th>操作</th></tr></thead>
+                        <tbody id="blogBody"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Stats -->
     <div id="statsGrid" class="grid grid-cols-2 md:grid-cols-6 gap-4"></div>
 
@@ -813,6 +857,168 @@ async function cancelEvent(date) {
     if (!confirm(`確定要取消 ${date}？會停發後續提醒。`)) return;
     const res = await fetch(`/admin/api/events/cancel?pw=${encodeURIComponent(adminPw)}&event=${encodeURIComponent(date)}`, { method: 'POST' });
     if (res.ok) { await loadEvents(); loadData(); } else alert('取消失敗');
+}
+
+// ─── 部落格管理 ───────────────────────────────────────────────────────────────
+let blogLoaded = false;
+let blogEditingSlug = null;  // null = 新增，否則為編輯中的既有 slug
+
+function toggleBlogPanel() {
+    const p = document.getElementById('blogPanel');
+    const open = p.classList.toggle('hidden') === false;
+    document.getElementById('blogPanelChevron').className = `fas fa-chevron-${open ? 'up' : 'down'} ml-2`;
+    if (open && !blogLoaded) loadBlogPosts();
+}
+
+async function loadBlogPosts() {
+    const body = document.getElementById('blogBody');
+    body.innerHTML = '<tr><td colspan="5" class="text-center text-slate-500 py-6">載入中…</td></tr>';
+    try {
+        const res = await fetch(`/admin/api/blog/posts?pw=${encodeURIComponent(adminPw)}`);
+        const json = await res.json();
+        if (!res.ok) { body.innerHTML = `<tr><td colspan="5" class="text-center text-amber-400 py-6">${esc(json.error || '載入失敗')}</td></tr>`; return; }
+        blogLoaded = true;
+        renderBlogPosts(json.posts || []);
+    } catch (e) {
+        body.innerHTML = '<tr><td colspan="5" class="text-center text-red-400 py-6">無法連線</td></tr>';
+    }
+}
+
+const BLOG_STATUS = {
+    published: '<span class="tag bg-emerald-500/20 text-emerald-300">🟢 已上架</span>',
+    draft:     '<span class="tag bg-slate-500/20 text-slate-300">📝 草稿</span>',
+};
+
+function renderBlogPosts(posts) {
+    document.getElementById('blogBody').innerHTML = posts.map(p => {
+        const url = `https://cosmoseed.com.tw/blog/${p.slug}`;
+        return `<tr>
+            <td class="max-w-[320px]">
+                <div class="font-medium">${esc(p.title || p.slug)}</div>
+                <div class="text-xs text-slate-500 font-mono">${esc(p.slug)}</div>
+            </td>
+            <td class="text-xs text-slate-400 whitespace-nowrap">${esc(p.publishDate || '—')}</td>
+            <td class="text-xs text-slate-400 whitespace-nowrap">${esc(p.category || '—')}</td>
+            <td>${p.draft ? BLOG_STATUS.draft : BLOG_STATUS.published}</td>
+            <td class="whitespace-nowrap">
+                <button onclick="editBlogPost('${esc(p.slug)}')" class="text-blue-400 hover:text-blue-300 text-xs px-2 py-1">編輯</button>
+                ${p.draft
+                    ? `<button onclick="setBlogPublish('${esc(p.slug)}', true)" class="text-emerald-400 hover:text-emerald-300 text-xs px-2 py-1">上架</button>`
+                    : `<button onclick="setBlogPublish('${esc(p.slug)}', false)" class="text-amber-400 hover:text-amber-300 text-xs px-2 py-1">下架</button>
+                       <a href="${url}" target="_blank" rel="noopener" class="text-slate-400 hover:text-slate-200 text-xs px-2 py-1">看文章</a>`}
+                <button onclick="deleteBlogPost('${esc(p.slug)}')" class="text-red-500 hover:text-red-400 text-xs px-2 py-1">刪除</button>
+            </td>
+        </tr>`;
+    }).join('') || '<tr><td colspan="5" class="text-center text-slate-600 py-6">尚無文章</td></tr>';
+}
+
+function blogTemplate() {
+    const today = new Date().toISOString().slice(0, 10);
+    return [
+        '---',
+        'title: "（70 字內，含核心關鍵字）"',
+        'description: "（50–160 字，含關鍵字，會出現在 Google 搜尋摘要與 OG 預覽）"',
+        `publishDate: ${today}`,
+        'author: "Din Din Wang 王宣方"',
+        'category: "工作流"',
+        'tags: ["標籤1", "標籤2"]',
+        'keywords:',
+        '  - 關鍵字1',
+        '  - 關鍵字2',
+        'tldr: "一句話總結核心觀點，有立場。"',
+        'faq:',
+        '  - question: "真實會被搜尋的問題？"',
+        '    answer: "100–200 字具體回答。"',
+        'draft: true',
+        '---',
+        '',
+        '## 第一個 H2 用問句或觀點句',
+        '',
+        '內文…',
+        '',
+    ].join('\n');
+}
+
+function newBlogDraft() {
+    blogEditingSlug = null;
+    document.getElementById('blogEditorTitle').textContent = '➕ 新增草稿';
+    const slugEl = document.getElementById('blogSlug');
+    slugEl.value = ''; slugEl.removeAttribute('readonly');
+    document.getElementById('blogContent').value = blogTemplate();
+    document.getElementById('blogSaveMsg').textContent = '';
+    const ed = document.getElementById('blogEditor');
+    ed.classList.remove('hidden');
+    ed.scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+
+async function editBlogPost(slug) {
+    const msg = document.getElementById('blogSaveMsg');
+    const ed = document.getElementById('blogEditor');
+    ed.classList.remove('hidden');
+    document.getElementById('blogEditorTitle').textContent = `✏️ 編輯 ${slug}`;
+    const slugEl = document.getElementById('blogSlug');
+    slugEl.value = slug; slugEl.setAttribute('readonly', 'readonly');
+    document.getElementById('blogContent').value = '載入中…';
+    msg.textContent = '';
+    blogEditingSlug = slug;
+    try {
+        const res = await fetch(`/admin/api/blog/posts/${encodeURIComponent(slug)}?pw=${encodeURIComponent(adminPw)}`);
+        const json = await res.json();
+        if (!res.ok) throw new Error(json.error || '載入失敗');
+        document.getElementById('blogContent').value = json.content;
+        ed.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    } catch (e) {
+        document.getElementById('blogContent').value = '';
+        msg.textContent = '❌ ' + e.message; msg.className = 'text-sm text-red-400';
+    }
+}
+
+function closeBlogEditor() {
+    document.getElementById('blogEditor').classList.add('hidden');
+    blogEditingSlug = null;
+}
+
+async function saveBlogPost() {
+    const slug = document.getElementById('blogSlug').value.trim();
+    const content = document.getElementById('blogContent').value;
+    const msg = document.getElementById('blogSaveMsg');
+    if (!slug) { msg.textContent = '❌ slug 必填'; msg.className = 'text-sm text-red-400'; return; }
+    if (!/^[a-z0-9-]+$/.test(slug)) { msg.textContent = '❌ slug 只能小寫英數與連字號'; msg.className = 'text-sm text-red-400'; return; }
+    msg.textContent = '儲存中…'; msg.className = 'text-sm text-slate-400';
+    try {
+        let res;
+        if (blogEditingSlug) {
+            res = await fetch(`/admin/api/blog/posts/${encodeURIComponent(blogEditingSlug)}?pw=${encodeURIComponent(adminPw)}`, {
+                method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ content }),
+            });
+        } else {
+            res = await fetch(`/admin/api/blog/posts?pw=${encodeURIComponent(adminPw)}`, {
+                method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ slug, content }),
+            });
+        }
+        const json = await res.json();
+        if (!res.ok) throw new Error(json.error || '儲存失敗');
+        msg.textContent = '✅ 已儲存，Netlify 部署中（約 1 分鐘）'; msg.className = 'text-sm text-emerald-400';
+        blogEditingSlug = slug;
+        document.getElementById('blogEditorTitle').textContent = `✏️ 編輯 ${slug}`;
+        document.getElementById('blogSlug').setAttribute('readonly', 'readonly');
+        loadBlogPosts();
+    } catch (e) {
+        msg.textContent = '❌ ' + e.message; msg.className = 'text-sm text-red-400';
+    }
+}
+
+async function setBlogPublish(slug, publish) {
+    const action = publish ? '上架' : '下架';
+    if (!confirm(`確定要${action}「${slug}」？\n${publish ? '會出現在網站、可被搜尋與 AI 引用。' : '會從網站隱藏（檔案保留，可再上架）。'}\nNetlify 重新部署約 1 分鐘。`)) return;
+    const res = await fetch(`/admin/api/blog/posts/${encodeURIComponent(slug)}/${publish ? 'publish' : 'unpublish'}?pw=${encodeURIComponent(adminPw)}`, { method: 'POST' });
+    if (res.ok) loadBlogPosts(); else { const j = await res.json().catch(() => ({})); alert(j.error || (action + '失敗')); }
+}
+
+async function deleteBlogPost(slug) {
+    if (!confirm(`確定要刪除「${slug}」？此動作會從 repo 移除檔案（不可復原）。`)) return;
+    const res = await fetch(`/admin/api/blog/posts/${encodeURIComponent(slug)}?pw=${encodeURIComponent(adminPw)}`, { method: 'DELETE' });
+    if (res.ok) loadBlogPosts(); else { const j = await res.json().catch(() => ({})); alert(j.error || '刪除失敗'); }
 }
 
 document.getElementById('pwInput')?.addEventListener('keydown', e => e.key === 'Enter' && login());

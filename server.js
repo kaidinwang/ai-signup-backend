@@ -1453,6 +1453,180 @@ app.post('/admin/api/events/cancel', adminAuth, async (req, res) => {
   res.json({ success: true, event: r.rows[0] });
 });
 
+// ─── 部落格管理（cosmoseed.com.tw/blog）────────────────────────────────────────
+// 內容住在 GitHub repo（靜態 Astro 站，PostLayout.astro 自動生 AEO schema），不搬進本 DB。
+// 後台用 GitHub Contents API 對 repo 增改 markdown；上架/下架 = toggle frontmatter 的
+// draft 欄位 + commit → Netlify 自動 rebuild（約 1 分鐘）。draft:true 的文章 Astro 不會
+// 產頁也不列入列表（見 index.astro / [slug].astro 的 !data.draft 過濾），等同下架。
+const BLOG_REPO = process.env.BLOG_REPO || 'kaidinwang/cosmoseed-blog';
+const BLOG_DIR = 'src/content/blog';
+const BLOG_BRANCH = process.env.BLOG_BRANCH || 'main';
+function githubReady() { return !!process.env.BLOG_GITHUB_TOKEN; }
+
+// GitHub REST API 呼叫（回 { status, json }）。需要 BLOG_GITHUB_TOKEN（fine-grained PAT，
+// 對 cosmoseed-blog 給 Contents read/write）。GitHub 強制要 User-Agent。
+function githubRequest(method, apiPath, body) {
+  return new Promise((resolve, reject) => {
+    const token = process.env.BLOG_GITHUB_TOKEN;
+    if (!token) return reject(new Error('BLOG_GITHUB_TOKEN not set'));
+    const payload = body ? JSON.stringify(body) : null;
+    const req = https.request({
+      hostname: 'api.github.com', path: apiPath, method,
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Accept: 'application/vnd.github+json',
+        'User-Agent': 'cosmoseed-admin',
+        'X-GitHub-Api-Version': '2022-11-28',
+        ...(payload ? { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(payload) } : {}),
+      },
+    }, res => {
+      let data = '';
+      res.on('data', c => data += c);
+      res.on('end', () => {
+        let json = null;
+        try { json = data ? JSON.parse(data) : null; } catch (_) {}
+        resolve({ status: res.statusCode, json });
+      });
+    });
+    req.on('error', reject);
+    if (payload) req.write(payload);
+    req.end();
+  });
+}
+
+// 從 markdown frontmatter 抽出列表/狀態要顯示的欄位
+function blogParseMeta(content) {
+  const m = content.match(/^---\n([\s\S]*?)\n---/);
+  const fm = m ? m[1] : '';
+  const get = k => {
+    const r = fm.match(new RegExp(`^${k}:\\s*(.*)$`, 'm'));
+    return r ? r[1].trim().replace(/^["']|["']$/g, '') : '';
+  };
+  return {
+    title: get('title'),
+    description: get('description'),
+    publishDate: get('publishDate'),
+    category: get('category'),
+    draft: get('draft') === 'true',
+  };
+}
+
+// 改寫 frontmatter 的 draft 欄位（沒有就補一行）。draft=true 下架、false 上架。
+function blogSetDraft(content, draft) {
+  const val = draft ? 'true' : 'false';
+  const m = content.match(/^---\n([\s\S]*?)\n---/);
+  if (!m) throw new Error('frontmatter not found');
+  let fm = m[1];
+  fm = /^draft:\s*.*$/m.test(fm)
+    ? fm.replace(/^draft:\s*.*$/m, `draft: ${val}`)
+    : `${fm}\ndraft: ${val}`;
+  return content.replace(/^---\n[\s\S]*?\n---/, () => `---\n${fm}\n---`);
+}
+
+async function blogGetFile(slug) {
+  const r = await githubRequest('GET',
+    `/repos/${BLOG_REPO}/contents/${BLOG_DIR}/${slug}.md?ref=${BLOG_BRANCH}`);
+  if (r.status !== 200 || !r.json?.content) return null;
+  return { content: Buffer.from(r.json.content, 'base64').toString('utf8'), sha: r.json.sha };
+}
+
+async function blogPutFile(slug, content, sha, message) {
+  const body = { message, content: Buffer.from(content, 'utf8').toString('base64'), branch: BLOG_BRANCH };
+  if (sha) body.sha = sha;
+  return githubRequest('PUT', `/repos/${BLOG_REPO}/contents/${BLOG_DIR}/${slug}.md`, body);
+}
+
+const blogGuard = (req, res) => {
+  if (!githubReady()) { res.status(503).json({ error: 'BLOG_GITHUB_TOKEN 未設定，後台還連不到部落格 repo。請到 Render 環境變數設定。' }); return false; }
+  return true;
+};
+
+// 列出所有文章（含草稿）+ 狀態
+app.get('/admin/api/blog/posts', adminAuth, async (req, res) => {
+  if (!blogGuard(req, res)) return;
+  try {
+    const r = await githubRequest('GET', `/repos/${BLOG_REPO}/contents/${BLOG_DIR}?ref=${BLOG_BRANCH}`);
+    if (r.status !== 200) return res.status(r.status).json({ error: r.json?.message || 'GitHub 列表失敗' });
+    const files = (r.json || []).filter(f => f.name && f.name.endsWith('.md'));
+    const posts = await Promise.all(files.map(async f => {
+      const slug = f.name.replace(/\.md$/, '');
+      const got = await blogGetFile(slug);
+      return { slug, ...(got ? blogParseMeta(got.content) : {}) };
+    }));
+    posts.sort((a, b) => (b.publishDate || '').localeCompare(a.publishDate || ''));
+    res.json({ posts, repo: BLOG_REPO });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// 取單篇 raw markdown（編輯用）
+app.get('/admin/api/blog/posts/:slug', adminAuth, async (req, res) => {
+  if (!blogGuard(req, res)) return;
+  try {
+    const got = await blogGetFile(req.params.slug);
+    if (!got) return res.status(404).json({ error: '找不到文章' });
+    res.json({ slug: req.params.slug, content: got.content, ...blogParseMeta(got.content) });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// 新增草稿（建檔，預設依 frontmatter；建議帶 draft:true）
+app.post('/admin/api/blog/posts', adminAuth, async (req, res) => {
+  if (!blogGuard(req, res)) return;
+  const { slug, content } = req.body || {};
+  if (!slug || !/^[a-z0-9-]+$/.test(slug)) return res.status(400).json({ error: 'slug 只能小寫英數與連字號，例：2026-06-24-my-post' });
+  if (!content || !content.trim()) return res.status(400).json({ error: '內容必填' });
+  try {
+    if (await blogGetFile(slug)) return res.status(409).json({ error: '同名文章已存在' });
+    const r = await blogPutFile(slug, content, null, `blog: 新增草稿 ${slug}`);
+    if (r.status >= 300) return res.status(r.status).json({ error: r.json?.message || '建立失敗' });
+    res.json({ ok: true, slug });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// 編輯內容（後端自行抓最新 sha，前端不必管）
+app.put('/admin/api/blog/posts/:slug', adminAuth, async (req, res) => {
+  if (!blogGuard(req, res)) return;
+  const { content } = req.body || {};
+  if (!content || !content.trim()) return res.status(400).json({ error: '內容必填' });
+  try {
+    const got = await blogGetFile(req.params.slug);
+    if (!got) return res.status(404).json({ error: '找不到文章' });
+    const r = await blogPutFile(req.params.slug, content, got.sha, `blog: 編輯 ${req.params.slug}`);
+    if (r.status >= 300) return res.status(r.status).json({ error: r.json?.message || '儲存失敗' });
+    res.json({ ok: true });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// 上架 / 下架（toggle frontmatter draft）
+async function blogSetPublish(slug, draft, res) {
+  const got = await blogGetFile(slug);
+  if (!got) return res.status(404).json({ error: '找不到文章' });
+  const updated = blogSetDraft(got.content, draft);
+  const r = await blogPutFile(slug, updated, got.sha, `blog: ${draft ? '下架' : '上架'} ${slug}`);
+  if (r.status >= 300) return res.status(r.status).json({ error: r.json?.message || '操作失敗' });
+  res.json({ ok: true, draft });
+}
+app.post('/admin/api/blog/posts/:slug/publish', adminAuth, async (req, res) => {
+  if (!blogGuard(req, res)) return;
+  try { await blogSetPublish(req.params.slug, false, res); } catch (e) { res.status(500).json({ error: e.message }); }
+});
+app.post('/admin/api/blog/posts/:slug/unpublish', adminAuth, async (req, res) => {
+  if (!blogGuard(req, res)) return;
+  try { await blogSetPublish(req.params.slug, true, res); } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// 刪除文章
+app.delete('/admin/api/blog/posts/:slug', adminAuth, async (req, res) => {
+  if (!blogGuard(req, res)) return;
+  try {
+    const got = await blogGetFile(req.params.slug);
+    if (!got) return res.status(404).json({ error: '找不到文章' });
+    const r = await githubRequest('DELETE', `/repos/${BLOG_REPO}/contents/${BLOG_DIR}/${req.params.slug}.md`,
+      { message: `blog: 刪除 ${req.params.slug}`, sha: got.sha, branch: BLOG_BRANCH });
+    if (r.status >= 300) return res.status(r.status).json({ error: r.json?.message || '刪除失敗' });
+    res.json({ ok: true });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 // 後台直接上傳場次 banner 圖檔（bytes 存 DB，持久；回傳可直接填進場次 banner 欄位的 URL）。
 // 用法：POST /admin/api/upload-banner?pw=...&filename=banner-0706.png  body=圖檔 binary，Content-Type: image/*
 app.post('/admin/api/upload-banner', adminAuth, express.raw({ type: ['image/*'], limit: '8mb' }), async (req, res) => {
