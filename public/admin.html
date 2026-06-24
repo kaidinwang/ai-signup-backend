@@ -140,8 +140,19 @@
                 </div>
 
                 <label class="text-sm space-y-1 block">
-                    <span class="text-slate-400">卡片短描述 blurb（顯示在課程頁「下一場 / 過去課程」卡）</span>
+                    <span class="text-slate-400">卡片短描述 blurb（顯示在課程頁「下一場 / 過去課程」卡 + 報名頁副標／og 描述）</span>
                     <textarea id="evBlurb" rows="2" placeholder="一句話介紹這堂課會學到什麼，吸引人報名" class="w-full p-2 rounded-lg bg-slate-800 border border-white/10 text-white"></textarea>
+                </label>
+
+                <label class="text-sm space-y-1 block">
+                    <span class="text-slate-400">報名頁 SEO description（選填，留空自動用 blurb）</span>
+                    <textarea id="evMetaDesc" rows="2" placeholder="給 Google／AI 搜尋看的一段描述，約 60–120 字，含日期＋主題＋關鍵字" class="w-full p-2 rounded-lg bg-slate-800 border border-white/10 text-white"></textarea>
+                </label>
+
+                <label class="text-sm space-y-1 block">
+                    <span class="text-slate-400">報名頁課綱 agenda（決定報名頁「本次課綱」整段，留空則不顯示課綱、只留 Q&A）</span>
+                    <textarea id="evAgenda" rows="12" placeholder="格式：空行分段，每段第一行「PART 1｜段落標題」，其餘每行一個項目；&#10;**文字** = 粗體；★開頭 = 星號重點，可用｜接副說明。&#10;&#10;範例：&#10;PART 1｜AI 當你的最強大腦&#10;AI 當你的**市場研究員**&#10;建立**品牌定位**&#10;&#10;PART 2｜AI 當你的萬能雙手&#10;**Threads 爆文**生成&#10;★現場完整示範｜帶你跑一遍完整流程" class="w-full p-2 rounded-lg bg-slate-800 border border-white/10 text-white font-mono text-xs leading-relaxed"></textarea>
+                    <p class="text-xs text-slate-500">空行分段＝一個 PART；<code>**粗體**</code>；<code>★重點｜副說明</code>。Q&A 區塊會自動加在最後。</p>
                 </label>
 
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -681,6 +692,8 @@ async function saveEvent(publish) {
         lecturer: document.getElementById('evLecturer').value.trim() || null,
         lecturer_img: document.getElementById('evLecturerImg').value.trim() || null,
         blurb: document.getElementById('evBlurb').value.trim() || null,
+        meta_desc: document.getElementById('evMetaDesc').value.trim() || null,
+        agenda: document.getElementById('evAgenda').value.trim() || null,
         start_at: `${date}T${start}:00+08:00`,
         end_at: end ? `${date}T${end}:00+08:00` : null,
         survey_url: document.getElementById('evSurvey').value.trim() || null,
@@ -774,6 +787,8 @@ function editEvent(date) {
     document.getElementById('evLecturer').value = e.lecturer || '';
     document.getElementById('evLecturerImg').value = e.lecturer_img || '';
     document.getElementById('evBlurb').value = e.blurb || '';
+    document.getElementById('evMetaDesc').value = e.meta_desc || '';
+    document.getElementById('evAgenda').value = e.agenda || '';
     document.getElementById('evStart').value = toHHMM(e.start_at);
     document.getElementById('evEnd').value = toHHMM(e.end_at);
     document.getElementById('evDayOff').value = e.reminder_day_offset_min ?? '';

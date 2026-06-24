@@ -114,11 +114,17 @@ app.use((req, res, next) => {
 // 根目錄改導向課程列表頁（5/18 後預設行為）
 // 想直接看舊報名表單請走 /register
 app.get('/', (req, res) => res.redirect(302, '/courses'));
-// 報名頁：沒有開放報名的場次時導回課程頁（顯示「籌備中」），避免看到過期場次的舊報名表單。
+// 報名頁：沒有開放報名的場次時導回課程頁（顯示「籌備中」）；有則從 events 表動態渲染整頁
+// （SEO/hero/日期/主題卡/課綱/出席題全自動長好）。渲染出錯 → 退回靜態 index.html（fail-safe）。
 app.get('/register', async (req, res) => {
-  const open = await getOpenEvent();
-  if (!open) return res.redirect(302, '/courses');
-  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+  try {
+    const open = await getOpenEvent();
+    if (!open) return res.redirect(302, '/courses');
+    res.type('html').send(renderRegisterPage(open));
+  } catch (e) {
+    console.error('[register] dynamic render fail, serving static:', e.message);
+    res.sendFile(path.join(__dirname, 'public', 'index.html'));
+  }
 });
 
 // 課程頁：從 events 表動態渲染「下一場 / 過去課程」卡，過期場次自動歸檔、沒開放場次顯示籌備中。
@@ -296,6 +302,8 @@ async function initDB() {
   await pool.query(`ALTER TABLE events ADD COLUMN IF NOT EXISTS blurb TEXT`);           // 卡片短描述（行銷文案）
   await pool.query(`ALTER TABLE events ADD COLUMN IF NOT EXISTS signups INTEGER`);      // 過去場：報名數（選填，顯示 stat tag）
   await pool.query(`ALTER TABLE events ADD COLUMN IF NOT EXISTS attended_count INTEGER`); // 過去場：出席數（選填）
+  await pool.query(`ALTER TABLE events ADD COLUMN IF NOT EXISTS meta_desc TEXT`);       // 報名頁 SEO description（選填，預設退回 blurb）
+  await pool.query(`ALTER TABLE events ADD COLUMN IF NOT EXISTS agenda TEXT`);          // 報名頁課綱純文字（空行分段、**粗體**、★星號重點）
   // 一次性 backfill：只在欄位仍為 NULL 時填（避免覆蓋後台日後手動編輯）。
   const seedCard = async (date, lecturer, img, blurb, signups = null, attended = null) =>
     pool.query(
@@ -311,6 +319,30 @@ async function initDB() {
     'Gemini Canvas 實作課：自然語言生成 AI 簡報、互動式旅遊小工具，不需設計或程式背景。');
   await seedCard('2026-06-22', '王宣方 Din Din Wang', '/dindin.jpg',
     '沒團隊、不懂行銷也能賣！用 ChatGPT 與 NotebookLM 打造內容系統：市場定位、品牌企劃、Threads 爆文、IG 文案到 AI 生圖一致性，新手也能上手。');
+
+  // 報名頁課綱 + SEO 一次性 backfill（給 6/22 當動態渲染的參考範本；只在 agenda 仍空時填）
+  await pool.query(
+    `UPDATE events SET meta_desc=$2, agenda=$3 WHERE event_date=$1 AND agenda IS NULL`,
+    ['2026-06-22',
+     '2026/6/22（一）20:00 免費線上 AI 共學聚。沒團隊、不懂行銷也能賣！用 ChatGPT 與 NotebookLM 打造你的內容系統：市場定位、品牌企劃、Threads 爆文、IG 文案、AI 生圖一致性，新手也能上手。Din Din Wang 王宣方主講。',
+     ['PART 1｜AI 當你的最強大腦',
+      'AI 當你的**市場研究員**',
+      '用 AI **分析競品**',
+      '建立**品牌定位**',
+      '**RACI 黃金指令**實戰',
+      '',
+      'PART 2｜AI 當你的萬能雙手',
+      '**社群內容規劃**',
+      '**Threads 爆文**生成',
+      '**IG 貼文撰寫**技巧',
+      '**高互動內容**設計',
+      '',
+      'PART 3｜全天候設計總監',
+      '各種**圖文素材**生成',
+      '**AI 生圖一致性**技巧',
+      '**AI 商業應用**流程',
+      '★現場完整示範｜Din Din 帶你跑一遍從零打造一人公司內容系統的完整流程'].join('\n')]
+  );
 
   console.log('DB ready');
 }
@@ -558,6 +590,191 @@ function coursesTemplate() {
 function fillDynBlock(html, name, inner) {
   const re = new RegExp(`<!-- DYN:${name}:START[\\s\\S]*?DYN:${name}:END -->`);
   return html.replace(re, `<!-- DYN:${name}:START -->\n${inner}\n        <!-- DYN:${name}:END -->`);
+}
+
+// ─── 報名落地頁 index.html 動態渲染（全自動：上架下一場後此頁自動長好，免手改）──────
+const SITE = 'https://event.cosmoseed.com.tw';
+// **x** → 粗體 span（先 escHtml 再轉粗體，避免 XSS 與標籤破壞）
+function boldify(s) {
+  return escHtml(s).replace(/\*\*(.+?)\*\*/g, '<span class="font-semibold text-slate-900">$1</span>');
+}
+function performerTitle(ev) {
+  const img = ev.lecturer_img || '';
+  const name = ev.lecturer || '';
+  if (/abang/i.test(img) || name.includes('阿邦')) return 'AI 應用實戰講師／企業數位轉型顧問';
+  return '品牌策略顧問／AI 應用陪跑教練';
+}
+function bannerAbs(ev) {
+  const b = ev.banner || '/banner.png';
+  return b.startsWith('http') ? b : SITE + b;
+}
+// 課綱純文字 → 設計過的 PART 卡 HTML。
+// 格式：空行分段；每段第 1 行「PART X｜標題」（或只標題）；其餘每行一個項目；
+//       **粗體**；★開頭=星號重點，可用｜接副說明。Q&A 區塊固定附在最後。
+function renderAgenda(text) {
+  const COLORS = ['blue', 'purple', 'amber'];
+  const blocks = String(text || '').trim().split(/\n\s*\n/).map(b => b.trim()).filter(Boolean);
+  const partsHtml = blocks.map((block, pi) => {
+    const lines = block.split('\n').map(l => l.trim()).filter(Boolean);
+    const head = lines.shift() || '';
+    const sep = head.split(/｜|\|/);
+    const label = sep.length > 1 ? sep[0].trim() : `PART ${pi + 1}`;
+    const title = sep.length > 1 ? sep.slice(1).join('｜').trim() : head;
+    const color = COLORS[pi % COLORS.length];
+    let n = 0;
+    const items = lines.map(raw => {
+      const line = raw.replace(/^[-•]\s*/, '');
+      if (/^★/.test(line)) {
+        const body = line.replace(/^★\s*/, '');
+        const [t, d] = body.split(/｜|\|/);
+        return `                        <li class="flex items-start gap-3">
+                            <span class="flex-shrink-0 w-6 h-6 rounded-md bg-amber-400 text-white text-[11px] font-bold flex items-center justify-center mt-0.5">★</span>
+                            <div class="flex-1">
+                                <div class="text-[14px] text-slate-900 font-semibold leading-relaxed">${boldify(t.trim())}</div>${d ? `
+                                <div class="text-[12.5px] text-slate-500 mt-0.5">${boldify(d.trim())}</div>` : ''}
+                            </div>
+                        </li>`;
+      }
+      n += 1;
+      return `                        <li class="flex items-start gap-3">
+                            <span class="flex-shrink-0 w-6 h-6 rounded-full bg-slate-900 text-white text-[11px] font-bold flex items-center justify-center mt-0.5">${n}</span>
+                            <div class="flex-1">
+                                <div class="text-[14px] text-slate-700 leading-relaxed">${boldify(line)}</div>
+                            </div>
+                        </li>`;
+    }).join('\n');
+    return `                <div>
+                    <div class="flex items-center gap-3 mb-3">
+                        <span class="display-font text-xs font-bold tracking-wider text-${color}-600 bg-${color}-50 px-2.5 py-1 rounded-md">${escHtml(label)}</span>
+                        <h3 class="font-bold text-slate-900 text-[16px]">${escHtml(title)}</h3>
+                    </div>
+                    <ol class="space-y-2.5 ml-3">
+${items}
+                    </ol>
+                </div>`;
+  }).join('\n\n');
+  const qa = `                <div class="pt-4 border-t border-slate-100">
+                    <div class="flex items-center gap-3">
+                        <span class="flex-shrink-0 w-6 h-6 rounded-full bg-emerald-500 text-white text-[11px] font-bold flex items-center justify-center">Q</span>
+                        <div class="text-[14px] font-semibold text-slate-900">Q & A 自由交流</div>
+                        <span class="text-[12.5px] text-slate-500">— 提問、討論</span>
+                    </div>
+                </div>`;
+  return partsHtml ? `${partsHtml}\n\n${qa}` : qa;
+}
+// 報名頁 SEO：title+description（DYN:SEO1）
+function renderSEOTitle(ev) {
+  const { big } = eventDateParts(ev.event_date);
+  const headline = `${big} AI 共學聚｜${ev.topic}`;
+  const desc = ev.meta_desc || ev.blurb || ev.topic;
+  return `<title>${escHtml(headline)}</title>
+    <meta name="description" content="${escHtml(desc)}">`;
+}
+// 報名頁 SEO：og + twitter（DYN:SEO2）
+function renderSEOSocial(ev) {
+  const { big } = eventDateParts(ev.event_date);
+  const headline = `${big} AI 共學聚｜${ev.topic}`;
+  const desc = ev.blurb || ev.meta_desc || ev.topic;
+  const img = bannerAbs(ev);
+  return `<!-- Open Graph / Facebook / LINE -->
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="${SITE}/">
+    <meta property="og:title" content="${escHtml(headline)}">
+    <meta property="og:description" content="${escHtml(desc)}">
+    <meta property="og:image" content="${escHtml(img)}">
+    <meta property="og:locale" content="zh_TW">
+    <meta property="og:site_name" content="宇宙種子 AI 共學聚">
+
+    <!-- Twitter -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="${escHtml(headline)}">
+    <meta name="twitter:description" content="${escHtml(desc)}">
+    <meta name="twitter:image" content="${escHtml(img)}">`;
+}
+// 報名頁 SEO：Event JSON-LD（DYN:SEO3）
+function renderSEOEvent(ev) {
+  const desc = ev.meta_desc || ev.blurb || ev.topic;
+  const img = bannerAbs(ev);
+  const eventJson = {
+    '@context': 'https://schema.org',
+    '@type': 'Event',
+    name: `AI 共學聚 — ${ev.topic}`,
+    startDate: new Date(ev.start_at).toISOString(),
+    endDate: ev.end_at ? new Date(ev.end_at).toISOString() : undefined,
+    eventAttendanceMode: 'https://schema.org/OnlineEventAttendanceMode',
+    eventStatus: 'https://schema.org/EventScheduled',
+    location: { '@type': 'VirtualLocation', url: `${SITE}/register` },
+    description: desc,
+    image: img,
+    inLanguage: 'zh-TW',
+    isAccessibleForFree: true,
+    organizer: { '@type': 'Organization', name: '宇宙種子 CosmoSeed AI', url: `${SITE}/` },
+    performer: { '@type': 'Person', name: ev.lecturer || 'AI 共學聚講師', jobTitle: performerTitle(ev) },
+    offers: { '@type': 'Offer', price: '0', priceCurrency: 'TWD', url: `${SITE}/register`, availability: 'https://schema.org/InStock' },
+  };
+  return `<script type="application/ld+json">
+    ${JSON.stringify(eventJson, null, 2).split('\n').join('\n    ')}
+    </script>`;
+}
+// 本月主題卡內容（標題 + 副標 + 主講 pill + 課綱）
+function renderThemeCard(ev) {
+  return `<div class="text-center">
+            <div class="inline-block px-3 py-1 rounded-full bg-gradient-to-r from-blue-50 to-purple-50 border border-blue-100 text-xs font-semibold text-blue-700 mb-4 tracking-wide">
+                本月主題
+            </div>
+            <h2 class="display-font text-2xl md:text-3xl font-bold text-slate-900 mb-3 leading-snug">${escHtml(ev.topic)}</h2>
+            <p class="text-slate-600 text-[15px] md:text-base leading-relaxed max-w-lg mx-auto">${escHtml(ev.blurb || '')}</p>
+        </div>
+
+        <div class="mt-7 pt-6 border-t border-slate-100">
+            <div class="flex flex-col items-center gap-2 mb-5">
+                <div class="display-font text-lg font-bold text-slate-900">本次課綱</div>
+                <div class="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200/70">
+                    <span class="text-[11px] font-semibold tracking-wider text-amber-700">主講</span>
+                    <span class="display-font text-sm font-bold text-slate-900">${escHtml(ev.lecturer || '')}</span>
+                </div>
+            </div>
+            <div class="space-y-6 max-w-xl mx-auto">
+${renderAgenda(ev.agenda)}
+            </div>
+        </div>`;
+}
+// 報名頁模板（讀一次存記憶體）
+let _registerTemplate = null;
+function registerTemplate() {
+  if (_registerTemplate == null) {
+    _registerTemplate = fs.readFileSync(path.join(__dirname, 'public', 'index.html'), 'utf8');
+  }
+  return _registerTemplate;
+}
+// 把當前開放場次填進報名頁所有 DYN 標記區
+function renderRegisterPage(ev) {
+  const { big, weekday } = eventDateParts(ev.event_date);
+  const time = eventTimeRange(ev);
+  const dateLabel = `${big}（${weekday.replace('週', '')}）${time}`;  // 6/22（一）20:00–21:00
+  let html = registerTemplate();
+  html = fillDynBlock(html, 'SEO1', renderSEOTitle(ev));
+  html = fillDynBlock(html, 'SEO2', renderSEOSocial(ev));
+  html = fillDynBlock(html, 'SEO3', renderSEOEvent(ev));
+  html = fillDynBlock(html, 'HERO', `<img src="${escHtml(ev.banner || '/banner.png')}" alt="${escHtml(ev.topic)}" class="w-full h-auto block">`);
+  html = fillDynBlock(html, 'DATECARD', `<div>
+                <div class="text-xs text-slate-500 mb-1">日期</div>
+                <div class="display-font text-2xl font-bold text-slate-900 whitespace-nowrap">${big} <span class="text-base font-medium text-slate-500">(${weekday})</span></div>
+            </div>
+            <div class="w-px h-10 bg-slate-200"></div>
+            <div>
+                <div class="text-xs text-slate-500 mb-1">時間</div>
+                <div class="display-font text-2xl font-bold text-slate-900 whitespace-nowrap">${time.replace('–', ' – ')}</div>
+            </div>
+            <div class="w-px h-10 bg-slate-200 hidden sm:block"></div>
+            <div class="hidden sm:block">
+                <div class="text-xs text-slate-500 mb-1">形式</div>
+                <div class="display-font text-2xl font-bold text-slate-900">線上</div>
+            </div>`);
+  html = fillDynBlock(html, 'THEME', renderThemeCard(ev));
+  html = fillDynBlock(html, 'SUCCESS', `${dateLabel} 線上見！Meet 連結已寄到你的 Email，綁定 LINE 還可即時收提醒`);
+  html = fillDynBlock(html, 'ATTEND', `${big} 晚上你能參加嗎？`);
+  return html;
 }
 
 // ─── LINE Client ─────────────────────────────────────────────────────────────
@@ -1186,10 +1403,10 @@ app.post('/admin/api/events', adminAuth, async (req, res) => {
       INSERT INTO events
         (event_date, title, topic, label, prep, meet_url, banner, start_at, end_at,
          registration_open_at, survey_url, reminder_day_offset_min, reminder_hour_offset_min,
-         survey_offset_min, status, lecturer, lecturer_img, blurb)
+         survey_offset_min, status, lecturer, lecturer_img, blurb, meta_desc, agenda)
       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,
               COALESCE($12,1440), COALESCE($13,90), COALESCE($14,720), COALESCE($15,'draft'),
-              $16,$17,$18)
+              $16,$17,$18,$19,$20)
       ON CONFLICT (event_date) DO UPDATE SET
         title=EXCLUDED.title, topic=EXCLUDED.topic, label=EXCLUDED.label, prep=EXCLUDED.prep,
         meet_url=EXCLUDED.meet_url, banner=EXCLUDED.banner, start_at=EXCLUDED.start_at,
@@ -1201,12 +1418,15 @@ app.post('/admin/api/events', adminAuth, async (req, res) => {
         status=EXCLUDED.status,
         lecturer=COALESCE(EXCLUDED.lecturer, events.lecturer),
         lecturer_img=COALESCE(EXCLUDED.lecturer_img, events.lecturer_img),
-        blurb=COALESCE(EXCLUDED.blurb, events.blurb)
+        blurb=COALESCE(EXCLUDED.blurb, events.blurb),
+        meta_desc=COALESCE(EXCLUDED.meta_desc, events.meta_desc),
+        agenda=COALESCE(EXCLUDED.agenda, events.agenda)
       RETURNING *
     `, [event_date, b.title, b.topic, b.label || null, b.prep || null, b.meet_url || null,
         b.banner || null, b.start_at, b.end_at || null, b.registration_open_at || null,
         b.survey_url || null, b.reminder_day_offset_min, b.reminder_hour_offset_min,
-        b.survey_offset_min, b.status, b.lecturer || null, b.lecturer_img || null, b.blurb || null]);
+        b.survey_offset_min, b.status, b.lecturer || null, b.lecturer_img || null, b.blurb || null,
+        b.meta_desc || null, b.agenda || null]);
     invalidateCurrentEvent();   // 場次內容/狀態變了 → 下次 getCurrentEvent 立即重算
     res.json({ success: true, event: result.rows[0] });
   } catch (err) {
@@ -1924,3 +2144,4 @@ tryInitDB().catch(err => {
     }
   });
 });
+

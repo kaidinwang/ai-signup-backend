@@ -3,13 +3,16 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- DYN:SEO1:START 由 server.js 依當前開放場次填入 title/description；下方為 fallback。 -->
     <title>6/22 AI 共學聚｜一人公司品牌內容實戰！用 ChatGPT 快速打造你的內容系統</title>
     <meta name="description" content="2026/6/22（一）20:00 免費線上 AI 共學聚。沒團隊、不懂行銷也能賣！用 ChatGPT 與 NotebookLM 打造你的內容系統：市場定位、品牌企劃、Threads 爆文、IG 文案、AI 生圖一致性，新手也能上手。Din Din Wang 王宣方主講。宇宙種子 CosmoSeed AI 主辦，每月兩次免費共學。">
+    <!-- DYN:SEO1:END -->
     <meta name="keywords" content="AI 共學, 一人公司, 內容系統, ChatGPT 教學, NotebookLM, AI 行銷, 品牌定位, Threads 爆文, IG 文案, AI 生圖, AI 教學, AI 課程, Claude 教學, AI 工具, AI 工作流, Prompt Engineering, RACI, 宇宙種子, CosmoSeed, AI 內容創作, AI 自動化, AI 線上課程, Din Din Wang, 王宣方">
     <link rel="canonical" href="https://event.cosmoseed.com.tw/">
     <link rel="icon" type="image/png" href="/favicon.png">
     <link rel="apple-touch-icon" href="/apple-touch-icon.png">
 
+    <!-- DYN:SEO2:START 由 server.js 依當前開放場次填入 og/twitter；下方為 fallback。 -->
     <!-- Open Graph / Facebook / LINE -->
     <meta property="og:type" content="website">
     <meta property="og:url" content="https://event.cosmoseed.com.tw/">
@@ -24,6 +27,7 @@
     <meta name="twitter:title" content="6/22 AI 共學聚｜一人公司品牌內容實戰！用 ChatGPT 快速打造你的內容系統">
     <meta name="twitter:description" content="沒團隊、不懂行銷也能賣！6/22 線上免費，用 ChatGPT 打造你的內容系統。Din Din Wang 王宣方主講。">
     <meta name="twitter:image" content="https://event.cosmoseed.com.tw/banner.png">
+    <!-- DYN:SEO2:END -->
 
     <!-- JSON-LD: Organization 宇宙種子 -->
     <script type="application/ld+json">
@@ -72,7 +76,7 @@
           "name": "AI 共學聚多久舉辦一次？什麼時候？",
           "acceptedAnswer": {
             "@type": "Answer",
-            "text": "每月兩次線上聚會，通常在週一晚上 20:00 開始透過 Google Meet 進行。下一場是 2026 年 6 月 22 日（週一）20:00–21:00，主題為「一人公司品牌內容實戰！用 ChatGPT 快速打造你的內容系統」，由 Din Din Wang 王宣方主講。"
+            "text": "每月兩次線上聚會，通常在週一晚上 20:00 開始透過 Google Meet 進行。下一場的日期與主題請見課程頁 https://event.cosmoseed.com.tw/courses 與報名頁；想第一時間收到開課通知可加入官方 LINE。"
           }
         },
         {
@@ -94,7 +98,8 @@
       ]
     }
     </script>
-    <!-- JSON-LD: 6/22 共學聚 Event -->
+    <!-- DYN:SEO3:START 由 server.js 依當前開放場次填入 Event JSON-LD；下方為 fallback。 -->
+    <!-- JSON-LD: 共學聚 Event -->
     <script type="application/ld+json">
     {
       "@context": "https://schema.org",
@@ -127,11 +132,11 @@
         "price": "0",
         "priceCurrency": "TWD",
         "url": "https://event.cosmoseed.com.tw/register",
-        "availability": "https://schema.org/InStock",
-        "validFrom": "2026-06-08T00:00:00+08:00"
+        "availability": "https://schema.org/InStock"
       }
     }
     </script>
+    <!-- DYN:SEO3:END -->
 
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
@@ -320,7 +325,7 @@
     <div class="modal-card rounded-3xl p-8 text-center max-w-sm mx-4 space-y-4">
         <div class="text-5xl">🎉</div>
         <h2 class="text-2xl font-bold display-font">報名成功 🌱</h2>
-        <p class="text-slate-400 text-sm">6/22（一）20:00 線上見！Meet 連結已寄到你的 Email，綁定 LINE 還可即時收提醒</p>
+        <p class="text-slate-400 text-sm"><!-- DYN:SUCCESS:START -->6/22（一）20:00 線上見！Meet 連結已寄到你的 Email，綁定 LINE 還可即時收提醒<!-- DYN:SUCCESS:END --></p>
 
         <div class="bg-green-500/10 border border-green-500/20 rounded-2xl p-4 text-left space-y-3">
             <p class="text-green-300 font-semibold text-sm text-center">綁定 LINE，立即收到 Meet 連結</p>
@@ -355,7 +360,9 @@
 
     <!-- Hero Banner -->
     <div class="rounded-2xl overflow-hidden shadow-lg shadow-blue-900/10">
+        <!-- DYN:HERO:START -->
         <img src="/banner.png" alt="6/22 AI 共學聚 — 一人公司品牌內容實戰！用 ChatGPT 快速打造你的內容系統" class="w-full h-auto block">
+        <!-- DYN:HERO:END -->
     </div>
 
     <!-- Header (light) -->
@@ -383,6 +390,7 @@
             </p>
         </div>
         <div class="inline-flex items-center gap-6 px-6 py-4 rounded-2xl bg-white/70 border border-slate-200/80 backdrop-blur">
+            <!-- DYN:DATECARD:START -->
             <div>
                 <div class="text-xs text-slate-500 mb-1">日期</div>
                 <div class="display-font text-2xl font-bold text-slate-900 whitespace-nowrap">6/22 <span class="text-base font-medium text-slate-500">(週一)</span></div>
@@ -397,11 +405,13 @@
                 <div class="text-xs text-slate-500 mb-1">形式</div>
                 <div class="display-font text-2xl font-bold text-slate-900">線上</div>
             </div>
+            <!-- DYN:DATECARD:END -->
         </div>
     </header>
 
     <!-- 本月主題卡 -->
     <section class="bg-white border border-slate-200/80 rounded-3xl p-7 md:p-9 shadow-[0_10px_30px_-10px_rgba(15,23,42,0.08)]">
+        <!-- DYN:THEME:START 由 server.js 依當前開放場次填入（主題標題/副標/主講/課綱）；下方為 fallback。 -->
         <div class="text-center">
             <div class="inline-block px-3 py-1 rounded-full bg-gradient-to-r from-blue-50 to-purple-50 border border-blue-100 text-xs font-semibold text-blue-700 mb-4 tracking-wide">
                 本月主題
@@ -537,6 +547,7 @@
                 </div>
             </div>
         </div>
+        <!-- DYN:THEME:END -->
     </section>
 
     <!-- Form Card (dark) -->
@@ -561,7 +572,7 @@
             <!-- 出席確認 -->
             <div class="space-y-3">
                 <div class="section-label">出席</div>
-                <div class="section-heading">6/22 晚上你能參加嗎？ <span class="req">必填</span></div>
+                <div class="section-heading"><!-- DYN:ATTEND:START -->6/22 晚上你能參加嗎？<!-- DYN:ATTEND:END --> <span class="req">必填</span></div>
                 <div class="space-y-2 pt-2">
                     <label class="radio-card">
                         <input type="radio" name="attendance" value="Yes" required>
