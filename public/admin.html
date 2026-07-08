@@ -158,7 +158,11 @@
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <label class="text-sm space-y-1">
                         <span class="text-slate-400">課後問卷連結 survey_url</span>
-                        <input id="evSurvey" type="text" placeholder="https://forms.gle/..." class="w-full p-2 rounded-lg bg-slate-800 border border-white/10 text-white">
+                        <div class="flex items-center gap-2">
+                            <input id="evSurvey" type="text" placeholder="留空＝自動用固定問卷" class="flex-1 p-2 rounded-lg bg-slate-800 border border-white/10 text-white">
+                            <button onclick="useDefaultSurvey()" type="button" class="px-3 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg text-xs whitespace-nowrap">填入固定問卷</button>
+                        </div>
+                        <p class="text-xs text-slate-500">留空 → 課後補推自動用固定問卷；要單場專屬問卷就自己貼一個。</p>
                     </label>
                     <div class="text-sm space-y-1">
                         <span class="text-slate-400">Banner 圖（直接上傳）</span>
@@ -180,11 +184,13 @@
                     </div>
                 </details>
 
-                <div class="flex items-center gap-3 pt-1">
-                    <button onclick="saveEvent(true)" class="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 rounded-xl font-bold transition-all flex items-center gap-2"><i class="fas fa-rocket"></i> 建立並上架</button>
-                    <button onclick="saveEvent(false)" class="px-4 py-2.5 bg-slate-700 hover:bg-slate-600 rounded-xl text-sm transition-all">只存草稿</button>
+                <div class="flex items-center gap-3 pt-1 flex-wrap">
+                    <button onclick="saveEvent('publish')" class="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 rounded-xl font-bold transition-all flex items-center gap-2"><i class="fas fa-rocket"></i> <span id="evPublishBtnLabel">建立並上架</span></button>
+                    <button onclick="saveEvent('update')" class="px-4 py-2.5 bg-blue-600 hover:bg-blue-500 rounded-xl text-sm font-bold transition-all flex items-center gap-2"><i class="fas fa-pen"></i> 更新內容（不改上架狀態）</button>
+                    <button onclick="saveEvent('draft')" class="px-4 py-2.5 bg-slate-700 hover:bg-slate-600 rounded-xl text-sm transition-all">只存草稿</button>
                     <span id="evSaveMsg" class="text-sm"></span>
                 </div>
+                <p class="text-xs text-slate-500 leading-relaxed">💡 <b>更新內容</b>＝修改已上架這場的文案／課綱／Meet／banner，但<b>維持原本上架狀態不動</b>（同一天要改內容按這顆，不會誤觸發重新上架）。</p>
                 <p class="text-xs text-slate-500 leading-relaxed">📌 上架（published）後，每分鐘的自動化 cron 會接管這場：前一天 / 當天提醒、課後問卷補推、LINE 報到都對這場生效。當前場次過了，會自動接棒到下一個已上架的未來場次，<b>不需要再改 Render 環境變數</b>。</p>
             </div>
 
@@ -640,6 +646,7 @@ function computeStats(rows) {
 
 // ─── 場次管理 / 上架 ──────────────────────────────────────────────────────────
 let eventsCache = [];
+let editingEventDate = null;  // 非 null＝表單正在編輯這場（用來判斷「更新」vs「覆蓋別場」）
 const WD = ['日','一','二','三','四','五','六'];
 
 function toggleEventPanel() {
@@ -713,7 +720,12 @@ async function uploadBanner() {
 
 function num(id) { const v = document.getElementById(id).value.trim(); return v === '' ? undefined : parseInt(v); }
 
-async function saveEvent(publish) {
+// 固定問卷連結（與 server.js mergeEventDefaults 的預設一致）
+const DEFAULT_SURVEY_URL = 'https://forms.gle/VA4JDwSvbg13scB58';
+function useDefaultSurvey() { document.getElementById('evSurvey').value = DEFAULT_SURVEY_URL; }
+
+// mode: 'publish'（上架/建立並上架）｜'update'（更新內容、維持原上架狀態）｜'draft'（存草稿）
+async function saveEvent(mode) {
     const date = document.getElementById('evDate').value;
     const title = document.getElementById('evTitle').value.trim();
     const topic = document.getElementById('evTopic').value.trim();
@@ -724,9 +736,31 @@ async function saveEvent(publish) {
         msg.textContent = '❌ 場次日期、短標題、主題、開始時間為必填'; msg.className = 'text-sm text-red-400';
         return;
     }
-    // 不勾「上架」時：既有場次保留原狀態（避免把已上架的當前場誤降為草稿），新場次才預設 draft
     const existing = eventsCache.find(e => e.event_date === date);
-    const status = publish ? 'published' : (existing ? existing.status : 'draft');
+    const bannerVal = document.getElementById('evBanner').value.trim();
+    const meetVal = document.getElementById('evMeet').value.trim();
+
+    // 同日覆蓋防呆：不是從「編輯」載入這場、卻填了已存在的日期 → 會覆蓋既有場次
+    if (existing && editingEventDate !== date) {
+        if (!confirm(`⚠️ ${date} 已經有一場「${existing.title}」。\n\n系統以「日期」為唯一鍵，儲存會「覆蓋」那一場的內容，不會另開一場。\n（若你要辦同一天兩場，目前架構還不支援，請先跟工程確認。）\n\n確定要覆蓋 ${date} 這場嗎？`)) return;
+    }
+
+    // 狀態決策
+    let status;
+    if (mode === 'publish') status = 'published';
+    else if (mode === 'update') status = existing ? existing.status : 'draft';
+    else { // 'draft'
+        if (existing && existing.status === 'published' &&
+            !confirm(`「${date}」目前是「已上架」。存成草稿等於把它下架（報名頁會關、縮圖會撤）。\n\n若只是要改內容、維持上架，請改按「更新內容」。\n\n確定要下架改草稿嗎？`)) return;
+        status = 'draft';
+    }
+
+    // 上架前把「會顯示給學員/縮圖」的關鍵欄位漏填擋一下（#1 縮圖、#6 會議連結）
+    if (mode === 'publish' || (mode === 'update' && status === 'published')) {
+        if (!bannerVal && !confirm('本場沒上傳專屬 banner。分享到 LINE 的縮圖會退回預設圖，可能沿用上一場視覺。\n\n仍要繼續嗎？（建議先上傳本場 banner）')) return;
+        if (!meetVal && !confirm('本場沒填 Meet 連結。報名確認信、課前提醒、LINE 都會退回「預設舊教室」連結，學員可能進到錯的會議室。\n\n仍要繼續嗎？（強烈建議填本場 Meet 連結）')) return;
+    }
+
     const body = {
         event_date: date, title, topic,
         label: document.getElementById('evLabel').value.trim() || null,
@@ -746,7 +780,8 @@ async function saveEvent(publish) {
         survey_offset_min: num('evSurveyOff'),
         status,
     };
-    if (publish && !confirm(`確定要「建立並上架」${date}（${title}）？\n\n上架後自動化 cron 會開始追這場（提醒／問卷／報到）。`)) return;
+    if (mode === 'publish' && !existing &&
+        !confirm(`確定要「建立並上架」${date}（${title}）？\n\n上架後自動化 cron 會開始追這場（提醒／問卷／報到）。`)) return;
     msg.textContent = '儲存中…'; msg.className = 'text-sm text-slate-400';
     try {
         const res = await fetch(`/admin/api/events?pw=${encodeURIComponent(adminPw)}`, {
@@ -754,7 +789,11 @@ async function saveEvent(publish) {
         });
         const json = await res.json();
         if (!res.ok) throw new Error(json.error || '儲存失敗');
-        msg.textContent = publish ? `🚀 已建立並上架 ${date}` : `💾 已存草稿 ${date}`; msg.className = 'text-sm text-emerald-400';
+        const doneMsg = mode === 'publish' ? `🚀 已上架 ${date}`
+            : mode === 'update' ? `💾 已更新 ${date}（維持${status === 'published' ? '上架' : '草稿'}）`
+            : `📝 已存草稿 ${date}`;
+        msg.textContent = doneMsg; msg.className = 'text-sm text-emerald-400';
+        editingEventDate = date;  // 存完後視為正在編輯這場，之後再按更新不會誤判成覆蓋
         await loadEvents();
         loadData();   // 重新整理 stats 的「當前場次」
     } catch (e) {
@@ -770,6 +809,8 @@ function resetEventForm() {
     document.getElementById('evBannerPreview').innerHTML = '';
     document.getElementById('evFormTitle').textContent = '➕ 建立新場次';
     document.getElementById('evSaveMsg').textContent = '';
+    editingEventDate = null;
+    document.getElementById('evPublishBtnLabel').textContent = '建立並上架';
 }
 
 async function loadEvents() {
@@ -819,6 +860,8 @@ function renderEvents(currentDate) {
 function editEvent(date) {
     const e = eventsCache.find(x => x.event_date === date);
     if (!e) return;
+    editingEventDate = date;
+    document.getElementById('evPublishBtnLabel').textContent = e.status === 'published' ? '重新上架' : '上架這場';
     const toHHMM = s => s ? new Date(s).toLocaleTimeString('en-GB', { timeZone:'Asia/Taipei', hour:'2-digit', minute:'2-digit' }) : '';
     document.getElementById('evDate').value = e.event_date;
     document.getElementById('evTitle').value = e.title || '';

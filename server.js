@@ -118,9 +118,12 @@ app.get('/', (req, res) => res.redirect(302, '/courses'));
 // （SEO/hero/日期/主題卡/課綱/出席題全自動長好）。渲染出錯 → 退回靜態 index.html（fail-safe）。
 app.get('/register', async (req, res) => {
   try {
-    const open = await getOpenEvent();
-    if (!open) return res.redirect(302, '/courses');
-    res.type('html').send(renderRegisterPage(open));
+    // ?event=YYYY-MM-DD → 直接叫出指定那一場的報名頁（可回看過去場次、複製沿用文案）；
+    // 沒帶或格式不符 → 照常顯示「當前開放中」的那場（單一真相源預設行為）。
+    const wanted = /^\d{4}-\d{2}-\d{2}$/.test(req.query.event || '') ? req.query.event : null;
+    const ev = wanted ? await getEventByDate(wanted) : await getOpenEvent();
+    if (!ev) return res.redirect(302, '/courses');
+    res.type('html').send(renderRegisterPage(ev));
   } catch (e) {
     console.error('[register] dynamic render fail, serving static:', e.message);
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
@@ -134,6 +137,13 @@ app.get('/courses', async (req, res) => {
     let html = coursesTemplate();
     const today = taipeiToday();
     const [open, events] = await Promise.all([getOpenEvent(), getPublicEvents()]);
+    if (open) {
+      // 分享縮圖（OG）同步成當前開放場次，避免沿用上一場的靜態快取
+      html = fillDynBlock(html, 'CSEO1', renderCoursesSEO1(open));
+      html = fillDynBlock(html, 'CSEO2', renderCoursesSEO2(open));
+      // Course JSON-LD 的「當前梯次」也同步（不能用 HTML 註解標記，改以唯一 type 錨點取代整個物件）
+      html = html.replace(/\{\s*"@type":\s*"CourseInstance"[\s\S]*?\n\s*\}/, renderCourseInstance(open));
+    }
     if (events) {
       html = fillDynBlock(html, 'NEXT', open ? renderNextCard(open) : renderComingSoonCard());
       const past = events.filter(e => e.event_date < today && (!open || e.event_date !== open.event_date));
@@ -606,7 +616,11 @@ function performerTitle(ev) {
 }
 function bannerAbs(ev) {
   const b = ev.banner || '/banner.png';
-  return b.startsWith('http') ? b : SITE + b;
+  const abs = b.startsWith('http') ? b : SITE + b;
+  // 加場次版本戳（?v=YYYYMMDD），讓 LINE/FB 針對每場當成新圖重抓，
+  // 避免分享縮圖沿用上一場的快取（尤其沒上傳專屬 banner、退回 /banner.png 時）。
+  const v = (ev.event_date || '').replace(/-/g, '');
+  return v ? `${abs}${abs.includes('?') ? '&' : '?'}v=${v}` : abs;
 }
 // 課綱純文字 → 設計過的 PART 卡 HTML。
 // 格式：空行分段；每段第 1 行「PART X｜標題」（或只標題）；其餘每行一個項目；
@@ -715,6 +729,54 @@ function renderSEOEvent(ev) {
   return `<script type="application/ld+json">
     ${JSON.stringify(eventJson, null, 2).split('\n').join('\n    ')}
     </script>`;
+}
+// ─── /courses 頁 OG（DYN:CSEO1 title+desc、DYN:CSEO2 og+twitter）─────────────────
+// 有開放中的場次時，把課程頁分享縮圖同步成「下一場」的主題/簡介/banner，
+// 避免報名連結在換場空窗期被 LINE 快取成上一場的靜態縮圖（本次縮圖顯示舊場次的根因）。
+function renderCoursesSEO1(ev) {
+  const { big } = eventDateParts(ev.event_date);
+  const title = `AI 共學聚｜下一場 ${big} ${ev.topic} — 宇宙種子 CosmoSeed AI`;
+  const desc = `下一場 ${big} 免費線上 AI 共學：${ev.blurb || ev.meta_desc || ev.topic}。每月兩次、0 程式基礎也能跟，含現場 Q&A 與 LINE 學員社群。宇宙種子 CosmoSeed AI 主辦。`;
+  return `<title>${escHtml(title)}</title>
+    <meta name="description" content="${escHtml(desc)}">`;
+}
+function renderCoursesSEO2(ev) {
+  const { big } = eventDateParts(ev.event_date);
+  const title = `AI 共學聚｜下一場 ${big} ${ev.topic}`;
+  const desc = ev.blurb || ev.meta_desc || ev.topic;
+  const img = bannerAbs(ev);
+  return `<meta property="og:type" content="website">
+    <meta property="og:url" content="${SITE}/courses">
+    <meta property="og:title" content="${escHtml(title)}">
+    <meta property="og:description" content="${escHtml(desc)}">
+    <meta property="og:image" content="${escHtml(img)}">
+    <meta property="og:locale" content="zh_TW">
+    <meta property="og:site_name" content="宇宙種子 AI 共學聚">
+
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="${escHtml(title)}">
+    <meta name="twitter:description" content="${escHtml(desc)}">
+    <meta name="twitter:image" content="${escHtml(img)}">`;
+}
+// /courses 的 Course JSON-LD 裡「當前梯次」CourseInstance（同步成開放中的場次，
+// 讓 Google 結構化資料不再停在上一場的日期）。以 JSON 轉義（非 HTML）產生，安全放進 <script> JSON-LD。
+function renderCourseInstance(ev) {
+  const { big } = eventDateParts(ev.event_date);
+  const start = new Date(ev.start_at).toISOString();
+  const end = ev.end_at
+    ? new Date(ev.end_at).toISOString()
+    : new Date(new Date(ev.start_at).getTime() + 3600000).toISOString();
+  const instructorId = /阿邦/.test(ev.lecturer || '') ? '#person-abang' : '#person-dindin';
+  return `{
+          "@type": "CourseInstance",
+          "name": ${JSON.stringify(`AI 共學聚 ${big} — ${ev.topic}`)},
+          "courseMode": "online",
+          "courseWorkload": "PT1H",
+          "startDate": "${start}",
+          "endDate": "${end}",
+          "instructor": { "@id": "https://event.cosmoseed.com.tw/${instructorId}" },
+          "location": { "@type": "VirtualLocation", "url": "https://event.cosmoseed.com.tw/register" }
+        }`;
 }
 // 本月主題卡內容（標題 + 副標 + 主講 pill + 課綱）
 function renderThemeCard(ev) {
