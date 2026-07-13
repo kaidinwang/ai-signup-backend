@@ -1858,9 +1858,11 @@ app.post('/admin/api/send-slides-line', adminAuth, async (req, res) => {
 // 用法：GET /admin/api/line-quota?pw=...
 app.get('/admin/api/line-quota', adminAuth, async (req, res) => {
   try {
-    if (!lineClient) return res.json({ error: 'LINE 未設定（LINE_CHANNEL_ACCESS_TOKEN 沒設）' });
-    const quota = await lineClient.getMessageQuota();                  // { type: 'none'|'limited', value }
-    const consumption = await lineClient.getMessageQuotaConsumption(); // { totalUsage }
+    const token = process.env.LINE_CHANNEL_ACCESS_TOKEN;
+    if (!token) return res.json({ error: 'LINE 未設定（LINE_CHANNEL_ACCESS_TOKEN 沒設）' });
+    // @line/bot-sdk v9 的 Client 沒有 getMessageQuota，直接打官方 API
+    const quota = await httpsGet('https://api.line.me/v2/bot/message/quota', token);                 // { type, value }
+    const consumption = await httpsGet('https://api.line.me/v2/bot/message/quota/consumption', token); // { totalUsage }
     const limit = quota.type === 'limited' ? quota.value : null;
     const used = consumption.totalUsage;
     res.json({
