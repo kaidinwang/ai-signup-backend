@@ -194,7 +194,7 @@
                     <button onclick="saveEvent('publish')" class="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 rounded-xl font-bold transition-all flex items-center gap-2"><i class="fas fa-rocket"></i> <span id="evPublishBtnLabel">建立並上架</span></button>
                     <button onclick="saveEvent('update')" class="px-4 py-2.5 bg-blue-600 hover:bg-blue-500 rounded-xl text-sm font-bold transition-all flex items-center gap-2"><i class="fas fa-pen"></i> 更新內容（不改上架狀態）</button>
                     <button onclick="saveEvent('draft')" class="px-4 py-2.5 bg-slate-700 hover:bg-slate-600 rounded-xl text-sm transition-all">只存草稿</button>
-                    <button onclick="sendSlidesLine()" class="px-4 py-2.5 bg-purple-600 hover:bg-purple-500 rounded-xl text-sm font-medium transition-all flex items-center gap-2"><i class="fas fa-chalkboard-teacher"></i> 課後發簡報 (LINE)</button>
+                    <button onclick="sendSlidesLine()" class="px-4 py-2.5 bg-purple-600 hover:bg-purple-500 rounded-xl text-sm font-medium transition-all flex items-center gap-2"><i class="fas fa-chalkboard-teacher"></i> 課後發簡報+問卷 (LINE)</button>
                     <span id="evSaveMsg" class="text-sm"></span>
                 </div>
                 <p class="text-xs text-slate-500 leading-relaxed">💡 <b>更新內容</b>＝修改已上架這場的文案／課綱／Meet／banner，但<b>維持原本上架狀態不動</b>（同一天要改內容按這顆，不會誤觸發重新上架）。</p>
@@ -738,13 +738,13 @@ async function sendSlidesLine() {
     const msg = document.getElementById('evSaveMsg');
     if (!date) { msg.textContent = '❌ 請先選場次日期'; msg.className = 'text-sm text-red-400'; return; }
     if (!url) { msg.textContent = '❌ 請先填「簡報下載連結」'; msg.className = 'text-sm text-red-400'; return; }
-    if (!confirm(`確定要用 LINE 把簡報下載連結發給「${date}」的報到者嗎？\n\n只會發給有綁 LINE 的報到者（attended=TRUE）；沒綁 LINE 的會列出來讓你另外用 email 補。\n建議先按「更新內容」把連結存起來。`)) return;
+    if (!confirm(`確定要用 LINE 把「簡報下載連結 + 課後問卷」發給「${date}」的報到者嗎？\n\n只會發給有綁 LINE 的報到者（attended=TRUE）；沒綁 LINE 的會列出來讓你另外用 email 補。\n（沒報到但有報名的人，課後問卷由系統自動 email 補寄，不必你手動。）\n建議先按「更新內容」把連結存起來。`)) return;
     msg.textContent = 'LINE 發送中…'; msg.className = 'text-sm text-slate-400';
     try {
         const res = await fetch(`/admin/api/send-slides-line?pw=${encodeURIComponent(adminPw)}&event=${encodeURIComponent(date)}&url=${encodeURIComponent(url)}`, { method: 'POST' });
         const json = await res.json();
         if (!res.ok) throw new Error(json.error || '發送失敗');
-        let m = `✅ 已用 LINE 發給 ${json.lineSent} 位報到者`;
+        let m = `✅ 已用 LINE 發簡報+問卷給 ${json.lineSent} 位報到者`;
         if (json.unboundCount) m += `；另有 ${json.unboundCount} 位報到者沒綁 LINE，需用 email 補（可用「匯出 CSV」撈名單）`;
         msg.textContent = m; msg.className = 'text-sm text-emerald-400';
     } catch (e) {

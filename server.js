@@ -1797,12 +1797,16 @@ app.post('/admin/api/send-slides-line', adminAuth, async (req, res) => {
          AND email IS NOT NULL AND email <> '' ORDER BY name ASC`,
       [eventDate]);
     const topicLine = ev.topic ? `${ev.topic}\n\n` : '';
-    const msg = `📊 本場簡報來囉！\n\n${topicLine}感謝你參與這場 AI 共學聚 🌱\n\n📥 簡報下載：\n${slidesUrl}\n\n喜歡的話歡迎期待下一場：\nhttps://event.cosmoseed.com.tw/courses\n\n— AI 共學聚團隊 🧬`;
+    // 課後訊息一次夾「簡報 + 問卷」——報到者(有綁 LINE)走這條就兩個都拿到；
+    // 沒報到的人由 cron 課後自動補寄問卷 email（sendPostEventSurvey），彼此不重複。
+    const surveyUrl = ev.survey_url || 'https://forms.gle/VA4JDwSvbg13scB58';
+    const surveyBlock = surveyUrl ? `📝 課後問卷（2 分鐘，你的回饋會幫我們把下一場做更好）：\n${surveyUrl}\n\n` : '';
+    const msg = `📊 本場簡報來囉！\n\n${topicLine}感謝你參與這場 AI 共學聚 🌱\n\n📥 簡報下載：\n${slidesUrl}\n\n${surveyBlock}喜歡的話歡迎期待下一場：\nhttps://event.cosmoseed.com.tw/courses\n\n— AI 共學聚團隊 🧬`;
     let sent = 0;
     if (!dryRun) { for (const r of bound.rows) { await sendLine(r.line_user_id, msg); sent++; } }
     else sent = bound.rows.length;
     console.log(`[SlidesLine] ${dryRun ? '(dry) ' : ''}event=${eventDate} line=${sent} unbound=${unbound.rows.length}`);
-    res.json({ success: true, dryRun, eventDate, slidesUrl, lineSent: sent,
+    res.json({ success: true, dryRun, eventDate, slidesUrl, surveyUrl, lineSent: sent,
       unboundCount: unbound.rows.length, unbound: unbound.rows });
   } catch (err) {
     console.error('[SlidesLine Error]', err.message);
