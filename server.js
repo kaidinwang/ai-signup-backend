@@ -894,12 +894,16 @@ async function sendEmail(to, subject, text, html) {
   }
 }
 
+// 回傳是否真的送出成功（讓呼叫端能算真實成功數，而不是「試了幾次」）。
+// 常見失敗：LINE 月推播配額用完（免費方案有上限）→ pushMessage 丟錯 → 這裡回 false。
 async function sendLine(userId, message) {
-  if (!lineClient || !userId) return;
+  if (!lineClient || !userId) return false;
   try {
     await lineClient.pushMessage(userId, { type: 'text', text: message });
+    return true;
   } catch (err) {
     console.error('[LINE Error]', err.message);
+    return false;
   }
 }
 
@@ -1390,27 +1394,33 @@ app.get('/admin/api/broadcast', adminAuth, async (req, res) => {
   }
 });
 
-// 課後問卷：寄給 5/18 報名 Yes/Maybe 但「沒報到」的人（避免跟簡報+問卷信重複）
-// 用法：POST /admin/api/send-survey-only?pw=...&event=2026-05-18[&survey=<URL>][&dry=1]
+// 課後 email（手動立即版）：寄「簡報（若已設）+ 課後問卷」給該場「全體 Yes/Maybe 報名者」。
+// 與 cron 的 sendPostEventSurvey 同口徑（全體、含簡報），差別只在這支是後台手動立刻觸發。
+// 用法：POST /admin/api/send-survey-only?pw=...&event=2026-07-13[&survey=<URL>][&dry=1]
 app.post('/admin/api/send-survey-only', adminAuth, async (req, res) => {
   try {
-    const eventDate = req.query.event || CURRENT_EVENT_DATE;
+    const eventDate = req.query.event || (await getCurrentEvent()).event_date;
     const dryRun = req.query.dry === '1';
-    const surveyUrl = req.query.survey || 'https://forms.gle/VA4JDwSvbg13scB58';
+    const evRow = await getEventByDate(eventDate);
+    const surveyUrl = req.query.survey || evRow?.survey_url || 'https://forms.gle/VA4JDwSvbg13scB58';
+    const slidesRow = await pool.query(`SELECT slides_url FROM event_slides WHERE event_date=$1`, [eventDate]);
+    const slidesUrl = slidesRow.rows[0]?.slides_url || null;
+    const slidesBlock = slidesUrl ? `📊 本場簡報下載：\n${slidesUrl}\n\n` : '';
 
     const result = await pool.query(
       `SELECT id, name, email FROM registrations
        WHERE event_date=$1 AND attendance IN ('Yes','Maybe')
-         AND (attended=FALSE OR attended IS NULL)
          AND email IS NOT NULL AND email <> ''
        ORDER BY name ASC`,
       [eventDate]
     );
 
     const sent = [];
-    const subject = `📝 AI 共學聚 ${eventDate} 課後問卷 — 給我們 2 分鐘 🌱`;
+    const subject = slidesUrl
+      ? `📊 AI 共學聚 ${eventDate} 簡報 + 課後問卷 🌱`
+      : `📝 AI 共學聚 ${eventDate} 課後問卷 — 給我們 2 分鐘 🌱`;
     for (const reg of result.rows) {
-      const text = `嗨 ${reg.name}！\n\n謝謝你報名 5/18 AI 共學聚 🌱\n\n如果你今晚有參與課程、想請你花 2 分鐘填一下回饋\n你的意見會幫助我們把下一場做得更好 💚\n\n📝 課後問卷：\n${surveyUrl}\n\n下一場 6/1（一）20:00，5/25 開放報名：\nhttps://event.cosmoseed.com.tw/courses\n\n— Din Din Wang 🧬\nAI 共學聚團隊`;
+      const text = `嗨 ${reg.name}！\n\n謝謝你參與這場 AI 共學聚 🌱\n\n${slidesBlock}想請你花 2 分鐘填一下回饋，你的意見會幫我們把下一場做得更好 💚\n\n📝 課後問卷：\n${surveyUrl}\n\n更多場次與報名：\nhttps://event.cosmoseed.com.tw/courses\n\n— Din Din Wang 🧬\nAI 共學聚團隊`;
       if (!dryRun) await sendEmail(reg.email, subject, text);
       sent.push({ id: reg.id, name: reg.name, email: reg.email });
     }
@@ -1418,12 +1428,18 @@ app.post('/admin/api/send-survey-only', adminAuth, async (req, res) => {
     // 副件給 admin
     const adminEmail = process.env.EMAIL_USER;
     if (!dryRun && adminEmail) {
-      const summary = `本場課後問卷信已寄出 ${sent.length} 封（不含 attended=TRUE 已收簡報信的人）\n\n📝 問卷連結：\n${surveyUrl}\n\n📝 收件名單：\n${sent.map((s, i) => `${i + 1}. ${s.name} <${s.email}>`).join('\n')}\n\n— AI 共學聚自動寄送 🧬`;
-      await sendEmail(adminEmail, `📝 [副件] ${eventDate} 課後問卷已寄出 (${sent.length} 人)`, summary);
+      const summary = `本場課後信（簡報+問卷）已寄出 ${sent.length} 封（全體 Yes/Maybe 報名者）\n\n📝 問卷連結：\n${surveyUrl}\n📊 簡報：\n${slidesUrl || '(未設)'}\n\n📝 收件名單：\n${sent.map((s, i) => `${i + 1}. ${s.name} <${s.email}>`).join('\n')}\n\n— AI 共學聚自動寄送 🧬`;
+      await sendEmail(adminEmail, `📝 [副件] ${eventDate} 課後信已寄出 (${sent.length} 人)`, summary);
     }
 
-    console.log(`[SurveyOnly] ${dryRun ? '(dry-run) ' : ''}event=${eventDate} sent=${sent.length}`);
-    res.json({ success: true, dryRun, eventDate, surveyUrl, count: sent.length, recipients: sent });
+    // 手動寄完就蓋戳記，避免 cron 課後再自動重寄一次（後台「課後信」戳記也會亮）
+    if (!dryRun) {
+      await pool.query(`UPDATE events SET survey_sent_at = NOW() WHERE event_date=$1`, [eventDate]);
+      invalidateCurrentEvent();
+    }
+
+    console.log(`[SurveyOnly] ${dryRun ? '(dry-run) ' : ''}event=${eventDate} sent=${sent.length} slides=${slidesUrl ? 'y' : 'n'}`);
+    res.json({ success: true, dryRun, eventDate, surveyUrl, slidesUrl, count: sent.length, recipients: sent });
   } catch (err) {
     console.error('[Send Survey Only Error]', err.message);
     res.status(500).json({ error: err.message });
@@ -1822,15 +1838,41 @@ app.post('/admin/api/send-slides-line', adminAuth, async (req, res) => {
     const surveyUrl = ev.survey_url || 'https://forms.gle/VA4JDwSvbg13scB58';
     const surveyBlock = surveyUrl ? `📝 課後問卷（2 分鐘，你的回饋會幫我們把下一場做更好）：\n${surveyUrl}\n\n` : '';
     const msg = `📊 本場簡報來囉！\n\n${topicLine}感謝你參與這場 AI 共學聚 🌱\n\n📥 簡報下載：\n${slidesUrl}\n\n${surveyBlock}喜歡的話歡迎期待下一場：\nhttps://event.cosmoseed.com.tw/courses\n\n— AI 共學聚團隊 🧬`;
-    let sent = 0;
-    if (!dryRun) { for (const r of bound.rows) { await sendLine(r.line_user_id, msg); sent++; } }
-    else sent = bound.rows.length;
-    console.log(`[SlidesLine] ${dryRun ? '(dry) ' : ''}event=${eventDate} line=${sent} unbound=${unbound.rows.length}`);
-    res.json({ success: true, dryRun, eventDate, slidesUrl, surveyUrl, lineSent: sent,
+    let sent = 0, failed = 0;
+    if (!dryRun) {
+      for (const r of bound.rows) {
+        const ok = await sendLine(r.line_user_id, msg);
+        if (ok) sent++; else failed++;   // 只算真的送成功的（失敗多半是 LINE 配額用完）
+      }
+    } else sent = bound.rows.length;
+    console.log(`[SlidesLine] ${dryRun ? '(dry) ' : ''}event=${eventDate} line=${sent} failed=${failed} unbound=${unbound.rows.length}`);
+    res.json({ success: true, dryRun, eventDate, slidesUrl, surveyUrl, lineSent: sent, lineFailed: failed,
       unboundCount: unbound.rows.length, unbound: unbound.rows });
   } catch (err) {
     console.error('[SlidesLine Error]', err.message);
     res.status(500).json({ error: err.message });
+  }
+});
+
+// LINE 推播用量診斷：看本月配額與已用量。用來判斷「發了但學生沒收到」是不是配額用完。
+// 用法：GET /admin/api/line-quota?pw=...
+app.get('/admin/api/line-quota', adminAuth, async (req, res) => {
+  try {
+    if (!lineClient) return res.json({ error: 'LINE 未設定（LINE_CHANNEL_ACCESS_TOKEN 沒設）' });
+    const quota = await lineClient.getMessageQuota();                  // { type: 'none'|'limited', value }
+    const consumption = await lineClient.getMessageQuotaConsumption(); // { totalUsage }
+    const limit = quota.type === 'limited' ? quota.value : null;
+    const used = consumption.totalUsage;
+    res.json({
+      plan: quota.type,   // 'none'=無月上限(付費/驗證帳號)、'limited'=有月上限(免費)
+      monthlyLimit: limit,
+      usedThisMonth: used,
+      remaining: limit != null ? Math.max(0, limit - used) : null,
+      exhausted: limit != null && used >= limit,
+    });
+  } catch (e) {
+    console.error('[line-quota]', e.message);
+    res.status(500).json({ error: e.message });
   }
 });
 
@@ -1962,22 +2004,29 @@ app.get('/admin/api/send-correction', adminAuth, async (req, res) => {
 });
 
 // 課後問卷自動補推：寄給該場 Yes/Maybe 但「沒報到」的人（attended 為 TRUE 的人會走簡報+問卷信，不重複）。
+// 課後 email：寄「簡報（若已設）+ 課後問卷」給該場「全體 Yes/Maybe 報名者」。
+// 不再只發給「沒報到」的人——因為線上很多人沒按 LINE 報到，問卷要覆蓋所有報名者。
+// email 是可靠通道（不受 LINE 月推播配額限制），確保每個留過 email 的人都收得到。
 async function sendPostEventSurvey(ev) {
   ev = mergeEventDefaults(ev);
+  const slidesRow = await pool.query(`SELECT slides_url FROM event_slides WHERE event_date=$1`, [ev.event_date]);
+  const slidesUrl = slidesRow.rows[0]?.slides_url || null;
+  const slidesBlock = slidesUrl ? `📊 本場簡報下載：\n${slidesUrl}\n\n` : '';
   const result = await pool.query(
     `SELECT id, name, email FROM registrations
      WHERE event_date=$1 AND attendance IN ('Yes','Maybe')
-       AND (attended=FALSE OR attended IS NULL)
        AND email IS NOT NULL AND email <> ''
      ORDER BY name ASC`,
     [ev.event_date]
   );
-  const subject = `📝 AI 共學聚 ${ev.event_date} 課後問卷 — 給我們 2 分鐘 🌱`;
+  const subject = slidesUrl
+    ? `📊 AI 共學聚 ${ev.event_date} 簡報 + 課後問卷 🌱`
+    : `📝 AI 共學聚 ${ev.event_date} 課後問卷 — 給我們 2 分鐘 🌱`;
   for (const reg of result.rows) {
-    const text = `嗨 ${reg.name}！\n\n謝謝你報名這場 AI 共學聚 🌱\n📌 主題：${ev.topic}\n\n如果你有參與課程、想請你花 2 分鐘填一下回饋\n你的意見會幫助我們把下一場做得更好 💚\n\n📝 課後問卷：\n${ev.survey_url}\n\n更多場次與報名：\nhttps://event.cosmoseed.com.tw/courses\n\n— Din Din Wang 🧬\nAI 共學聚團隊`;
+    const text = `嗨 ${reg.name}！\n\n謝謝你參與這場 AI 共學聚 🌱\n📌 主題：${ev.topic}\n\n${slidesBlock}想請你花 2 分鐘填一下回饋，你的意見會幫我們把下一場做得更好 💚\n\n📝 課後問卷：\n${ev.survey_url}\n\n更多場次與報名：\nhttps://event.cosmoseed.com.tw/courses\n\n— Din Din Wang 🧬\nAI 共學聚團隊`;
     await sendEmail(reg.email, subject, text);
   }
-  console.log(`[Survey] event=${ev.event_date} sent=${result.rows.length}`);
+  console.log(`[Survey] event=${ev.event_date} sent=${result.rows.length} slides=${slidesUrl ? 'y' : 'n'}`);
   return result.rows.length;
 }
 

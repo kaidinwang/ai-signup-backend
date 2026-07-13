@@ -869,7 +869,7 @@ function renderEvents(currentDate) {
         const stamps = [
             e.reminder_day_sent_at ? '前一天✅' : '前一天⬜',
             e.reminder_hour_sent_at ? '當天✅' : '當天⬜',
-            e.survey_sent_at ? '問卷✅' : '問卷⬜',
+            e.survey_sent_at ? '課後信✅' : '課後信⬜',
         ].join(' ');
         return `<tr>
             <td class="whitespace-nowrap font-medium">${esc(e.event_date)} ${isCur ? '<span class="tag bg-amber-500/20 text-amber-300">⭐ 當前</span>' : ''}</td>
