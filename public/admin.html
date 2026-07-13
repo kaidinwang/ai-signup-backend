@@ -175,6 +175,12 @@
                     </div>
                 </div>
 
+                <label class="text-sm space-y-1 block">
+                    <span class="text-slate-400">📊 簡報下載連結 slides_url（課後用「課後發簡報 (LINE)」發給報到者；報到當下不會顯示連結）</span>
+                    <input id="evSlides" type="text" placeholder="https://docs.google.com/presentation/...（請設「知道連結的人可檢視」）" class="w-full p-2 rounded-lg bg-slate-800 border border-white/10 text-white">
+                    <p class="text-xs text-slate-500">存這裡＝存進系統。學員打「日期報到」當下只會回「課後會用 LINE 發下載連結」，等你按下方「課後發簡報 (LINE)」才真的送出給所有報到者。</p>
+                </label>
+
                 <details class="text-sm">
                     <summary class="text-slate-400 cursor-pointer select-none">進階：提醒時間 offset（分鐘，留空用預設）</summary>
                     <div class="grid grid-cols-3 gap-3 mt-3">
@@ -188,6 +194,7 @@
                     <button onclick="saveEvent('publish')" class="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 rounded-xl font-bold transition-all flex items-center gap-2"><i class="fas fa-rocket"></i> <span id="evPublishBtnLabel">建立並上架</span></button>
                     <button onclick="saveEvent('update')" class="px-4 py-2.5 bg-blue-600 hover:bg-blue-500 rounded-xl text-sm font-bold transition-all flex items-center gap-2"><i class="fas fa-pen"></i> 更新內容（不改上架狀態）</button>
                     <button onclick="saveEvent('draft')" class="px-4 py-2.5 bg-slate-700 hover:bg-slate-600 rounded-xl text-sm transition-all">只存草稿</button>
+                    <button onclick="sendSlidesLine()" class="px-4 py-2.5 bg-purple-600 hover:bg-purple-500 rounded-xl text-sm font-medium transition-all flex items-center gap-2"><i class="fas fa-chalkboard-teacher"></i> 課後發簡報 (LINE)</button>
                     <span id="evSaveMsg" class="text-sm"></span>
                 </div>
                 <p class="text-xs text-slate-500 leading-relaxed">💡 <b>更新內容</b>＝修改已上架這場的文案／課綱／Meet／banner，但<b>維持原本上架狀態不動</b>（同一天要改內容按這顆，不會誤觸發重新上架）。</p>
@@ -724,6 +731,27 @@ function num(id) { const v = document.getElementById(id).value.trim(); return v 
 const DEFAULT_SURVEY_URL = 'https://forms.gle/VA4JDwSvbg13scB58';
 function useDefaultSurvey() { document.getElementById('evSurvey').value = DEFAULT_SURVEY_URL; }
 
+// 課後用 LINE 把簡報下載連結發給該場報到者（attended=TRUE 且有綁 LINE）
+async function sendSlidesLine() {
+    const date = document.getElementById('evDate').value;
+    const url = document.getElementById('evSlides').value.trim();
+    const msg = document.getElementById('evSaveMsg');
+    if (!date) { msg.textContent = '❌ 請先選場次日期'; msg.className = 'text-sm text-red-400'; return; }
+    if (!url) { msg.textContent = '❌ 請先填「簡報下載連結」'; msg.className = 'text-sm text-red-400'; return; }
+    if (!confirm(`確定要用 LINE 把簡報下載連結發給「${date}」的報到者嗎？\n\n只會發給有綁 LINE 的報到者（attended=TRUE）；沒綁 LINE 的會列出來讓你另外用 email 補。\n建議先按「更新內容」把連結存起來。`)) return;
+    msg.textContent = 'LINE 發送中…'; msg.className = 'text-sm text-slate-400';
+    try {
+        const res = await fetch(`/admin/api/send-slides-line?pw=${encodeURIComponent(adminPw)}&event=${encodeURIComponent(date)}&url=${encodeURIComponent(url)}`, { method: 'POST' });
+        const json = await res.json();
+        if (!res.ok) throw new Error(json.error || '發送失敗');
+        let m = `✅ 已用 LINE 發給 ${json.lineSent} 位報到者`;
+        if (json.unboundCount) m += `；另有 ${json.unboundCount} 位報到者沒綁 LINE，需用 email 補（可用「匯出 CSV」撈名單）`;
+        msg.textContent = m; msg.className = 'text-sm text-emerald-400';
+    } catch (e) {
+        msg.textContent = '❌ ' + e.message; msg.className = 'text-sm text-red-400';
+    }
+}
+
 // mode: 'publish'（上架/建立並上架）｜'update'（更新內容、維持原上架狀態）｜'draft'（存草稿）
 async function saveEvent(mode) {
     const date = document.getElementById('evDate').value;
@@ -772,6 +800,7 @@ async function saveEvent(mode) {
         blurb: document.getElementById('evBlurb').value.trim() || null,
         meta_desc: document.getElementById('evMetaDesc').value.trim() || null,
         agenda: document.getElementById('evAgenda').value.trim() || null,
+        slides_url: document.getElementById('evSlides').value.trim(),   // 空字串＝清掉；有值＝存/更新
         start_at: `${date}T${start}:00+08:00`,
         end_at: end ? `${date}T${end}:00+08:00` : null,
         survey_url: document.getElementById('evSurvey').value.trim() || null,
@@ -802,7 +831,7 @@ async function saveEvent(mode) {
 }
 
 function resetEventForm() {
-    ['evDate','evTitle','evTopic','evLabel','evMeet','evPrep','evSurvey','evBanner','evDayOff','evHourOff','evSurveyOff'].forEach(id => document.getElementById(id).value = '');
+    ['evDate','evTitle','evTopic','evLabel','evMeet','evPrep','evSurvey','evBanner','evSlides','evDayOff','evHourOff','evSurveyOff'].forEach(id => document.getElementById(id).value = '');
     document.getElementById('evPreset').value = 'din';
     document.getElementById('evStart').value = '20:00';
     document.getElementById('evEnd').value = '21:00';
@@ -876,6 +905,7 @@ function editEvent(date) {
     document.getElementById('evBlurb').value = e.blurb || '';
     document.getElementById('evMetaDesc').value = e.meta_desc || '';
     document.getElementById('evAgenda').value = e.agenda || '';
+    document.getElementById('evSlides').value = e.slides_url || '';
     document.getElementById('evStart').value = toHHMM(e.start_at);
     document.getElementById('evEnd').value = toHHMM(e.end_at);
     document.getElementById('evDayOff').value = e.reminder_day_offset_min ?? '';

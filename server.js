@@ -1197,12 +1197,8 @@ app.post('/webhook', express.raw({ type: '*/*' }), lineMiddleware, async (req, r
             );
           }
           await pool.query(`UPDATE line_bindings SET awaiting_attendance_email=FALSE WHERE line_user_id=$1`, [userId]);
-          const slidesRow = await pool.query(`SELECT slides_url FROM event_slides WHERE event_date=$1`, [ev.event_date]);
-          const slidesUrl = slidesRow.rows[0]?.slides_url || null;
           const greetLine = greetName ? `${greetName} 你好！\n\n` : '';
-          const replyText = slidesUrl
-            ? `✅ 報到成功！\n\n${greetLine}📊 本場簡報下載：\n${slidesUrl}`
-            : `✅ 報到成功！\n\n${greetLine}活動結束後簡報會寄到：\n📧 ${knownEmail}`;
+          const replyText = `✅ 報到成功！\n\n${greetLine}📊 本場簡報課後會用 LINE 發下載連結給你，記得留意通知 🌱`;
           await lineClient.replyMessage(event.replyToken, { type: 'text', text: replyText });
           continue;
         } else {
@@ -1212,11 +1208,7 @@ app.post('/webhook', express.raw({ type: '*/*' }), lineMiddleware, async (req, r
              ON CONFLICT (line_user_id) DO UPDATE SET awaiting_attendance_email=TRUE`,
             [userId]
           );
-          const slidesRow = await pool.query(`SELECT slides_url FROM event_slides WHERE event_date=$1`, [ev.event_date]);
-          const slidesUrl = slidesRow.rows[0]?.slides_url || null;
-          const replyText = slidesUrl
-            ? `✅ 報到成功！\n\n📊 本場簡報下載：\n${slidesUrl}\n\n想收課後問卷 / 下一場通知，\n歡迎傳你的 Email 給我 📧`
-            : `👋 找不到你的 Email 紀錄\n\n請傳你的 Email 給我（例如：yourname@gmail.com）\n活動結束後我會把簡報寄到那裡 📧`;
+          const replyText = `✅ 報到成功！\n\n📊 本場簡報課後會用 LINE 發下載連結給你 🌱\n\n想收課後問卷 / 下一場通知，歡迎再傳你的 Email 給我 📧`;
           await lineClient.replyMessage(event.replyToken, { type: 'text', text: replyText });
           continue;
         }
@@ -1242,11 +1234,7 @@ app.post('/webhook', express.raw({ type: '*/*' }), lineMiddleware, async (req, r
             `UPDATE line_bindings SET awaiting_attendance_email=FALSE, email=$2, display_name=COALESCE(display_name,$3) WHERE line_user_id=$1`,
             [userId, email, profile.displayName || null]
           );
-          const slidesRow = await pool.query(`SELECT slides_url FROM event_slides WHERE event_date=$1`, [ev.event_date]);
-          const slidesUrl = slidesRow.rows[0]?.slides_url || null;
-          const replyText = slidesUrl
-            ? `✅ 已記下！\n\n📊 本場簡報下載：\n${slidesUrl}`
-            : `✅ 已記下！\n\n活動結束後簡報會寄到：\n📧 ${email}`;
+          const replyText = `✅ 已記下，報到成功！\n\n📊 本場簡報課後會用 LINE 發下載連結給你 🌱`;
           await lineClient.replyMessage(event.replyToken, { type: 'text', text: replyText });
           continue;
         }
@@ -1449,7 +1437,11 @@ app.delete('/admin/api/event-slides', adminAuth, async (req, res) => {
 //   POST   /admin/api/events/publish?pw=...&event=YYYY-MM-DD   上架（status=published，自動化開始追這場）
 //   POST   /admin/api/events/cancel?pw=...&event=YYYY-MM-DD    取消（status=cancelled，停發後續提醒）
 app.get('/admin/api/events', adminAuth, async (req, res) => {
-  const result = await pool.query(`SELECT * FROM events ORDER BY event_date DESC`);
+  // 一併帶出各場的簡報下載連結（event_slides），讓後台表單能顯示/編輯
+  const result = await pool.query(`
+    SELECT e.*, s.slides_url
+    FROM events e LEFT JOIN event_slides s ON s.event_date = e.event_date
+    ORDER BY e.event_date DESC`);
   const current = await getCurrentEvent();
   res.json({ count: result.rows.length, events: result.rows, currentEventDate: current.event_date });
 });
@@ -1489,6 +1481,19 @@ app.post('/admin/api/events', adminAuth, async (req, res) => {
         b.survey_url || null, b.reminder_day_offset_min, b.reminder_hour_offset_min,
         b.survey_offset_min, b.status, b.lecturer || null, b.lecturer_img || null, b.blurb || null,
         b.meta_desc || null, b.agenda || null]);
+    // 簡報下載連結存進 event_slides（課後用「發簡報(LINE)」發給報到者；報到當下不顯示）。
+    // 有值＝upsert；空字串＝清掉；欄位沒帶（undefined）＝不動。
+    if (typeof b.slides_url === 'string') {
+      const su = b.slides_url.trim();
+      if (su) {
+        await pool.query(
+          `INSERT INTO event_slides (event_date, slides_url, updated_at) VALUES ($1,$2,NOW())
+           ON CONFLICT (event_date) DO UPDATE SET slides_url=EXCLUDED.slides_url, updated_at=NOW()`,
+          [event_date, su]);
+      } else {
+        await pool.query(`DELETE FROM event_slides WHERE event_date=$1`, [event_date]);
+      }
+    }
     invalidateCurrentEvent();   // 場次內容/狀態變了 → 下次 getCurrentEvent 立即重算
     res.json({ success: true, event: result.rows[0] });
   } catch (err) {
@@ -1753,6 +1758,45 @@ app.post('/admin/api/send-slides', adminAuth, async (req, res) => {
     res.json({ success: true, dryRun, eventDate, slidesUrl, count: sent.length, recipients: sent });
   } catch (err) {
     console.error('[Send Slides Error]', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 課後用 LINE 把簡報下載連結發給「該場報到者」(attended=TRUE 且有綁 LINE)。
+// url 省略時用 event_slides 表存的連結。沒綁 LINE 的報到者會回傳清單，讓 Din 另用 email 補（走 send-slides）。
+// 用法：POST /admin/api/send-slides-line?pw=...&event=2026-07-13[&url=...][&dry=1]
+app.post('/admin/api/send-slides-line', adminAuth, async (req, res) => {
+  try {
+    const eventDate = req.query.event || (await getCurrentEvent()).event_date;
+    let slidesUrl = req.query.url || req.body?.url;
+    if (!slidesUrl) {
+      const row = await pool.query(`SELECT slides_url FROM event_slides WHERE event_date=$1`, [eventDate]);
+      slidesUrl = row.rows[0]?.slides_url || null;
+    }
+    if (!slidesUrl) return res.status(400).json({ error: '這場還沒設定簡報下載連結（先在場次表單填「簡報下載連結」並儲存，或帶 ?url=）' });
+    const dryRun = req.query.dry === '1';
+    const ev = (await getEventByDate(eventDate)) || { event_date: eventDate, topic: '' };
+    // 報到者（attended=TRUE）有綁 LINE 的 → 走 LINE 發
+    const bound = await pool.query(
+      `SELECT DISTINCT ON (line_user_id) line_user_id, name FROM registrations
+       WHERE event_date=$1 AND attended=TRUE AND line_user_id IS NOT NULL`,
+      [eventDate]);
+    // 報到但沒綁 LINE 的 → 回清單提醒 Din 用 email 補
+    const unbound = await pool.query(
+      `SELECT name, email FROM registrations
+       WHERE event_date=$1 AND attended=TRUE AND line_user_id IS NULL
+         AND email IS NOT NULL AND email <> '' ORDER BY name ASC`,
+      [eventDate]);
+    const topicLine = ev.topic ? `${ev.topic}\n\n` : '';
+    const msg = `📊 本場簡報來囉！\n\n${topicLine}感謝你參與這場 AI 共學聚 🌱\n\n📥 簡報下載：\n${slidesUrl}\n\n喜歡的話歡迎期待下一場：\nhttps://event.cosmoseed.com.tw/courses\n\n— AI 共學聚團隊 🧬`;
+    let sent = 0;
+    if (!dryRun) { for (const r of bound.rows) { await sendLine(r.line_user_id, msg); sent++; } }
+    else sent = bound.rows.length;
+    console.log(`[SlidesLine] ${dryRun ? '(dry) ' : ''}event=${eventDate} line=${sent} unbound=${unbound.rows.length}`);
+    res.json({ success: true, dryRun, eventDate, slidesUrl, lineSent: sent,
+      unboundCount: unbound.rows.length, unbound: unbound.rows });
+  } catch (err) {
+    console.error('[SlidesLine Error]', err.message);
     res.status(500).json({ error: err.message });
   }
 });
