@@ -146,7 +146,12 @@ app.get('/courses', async (req, res) => {
     }
     if (events) {
       html = fillDynBlock(html, 'NEXT', open ? renderNextCard(open) : renderComingSoonCard());
-      const past = events.filter(e => e.event_date < today && (!open || e.event_date !== open.event_date));
+      // 過去/已結束＝不是當前開放場，且（日期已過 或 已到上課開始時間）。
+      // 這樣一過上課時間、報名關閉後，該場會立刻落到「過去課程」而不是從頁面消失。
+      const nowMs = Date.now();
+      const past = events.filter(e =>
+        (!open || e.event_date !== open.event_date) &&
+        (e.event_date < today || (e.start_at && new Date(e.start_at).getTime() <= nowMs)));
       if (past.length) html = fillDynBlock(html, 'PAST', past.map(renderPastCard).join('\n        '));
     }
     res.type('html').send(html);
@@ -443,20 +448,24 @@ function currentEventSync() {
 
 // ─── 開放報名場次 + 公開場次清單（/courses 動態渲染、報名擋關用）──────────────
 // getCurrentEvent() 在「沒有未來場」時會退回最近的過去場（給課後信/問卷用），
-// 但「能不能報名」要的是嚴格的「今天/未來 且 已上架」——過了就沒有開放場次 → 報名關閉。
+// 但「能不能報名」要的是嚴格的「還沒開始 且 已上架」——過了上課時間就沒有開放場次 → 報名關閉。
 let _openEventCache = { v: undefined, at: 0 };
 let _publicEventsCache = { v: undefined, at: 0 };
 
-// 目前開放報名的場次：status='published' 且 event_date >= 今天，取最近一場；沒有則 null。
+// 目前開放報名的場次：status='published' 且「還沒到上課時間」(start_at > NOW())，取最近一場；沒有則 null。
+// → 一過上課開始時間（例如 20:00）就自動關閉報名（/register 導回 /courses、報名 POST 擋掉、/check-email 回 closed）。
+//   注意：課中/課後的 LINE「報到」走 getCurrentEvent（會續留在這場），不受此關閉影響。
+//   缺 start_at 的場次退回「當天整天開放」，避免舊資料誤關。
 async function getOpenEvent() {
   const now = Date.now();
   if (_openEventCache.v !== undefined && now - _openEventCache.at < 60000) return _openEventCache.v;
   let result = null;
   try {
     const r = await pool.query(
-      `SELECT * FROM events WHERE status='published' AND event_date >= $1
-       ORDER BY event_date ASC LIMIT 1`,
-      [taipeiToday()]
+      `SELECT * FROM events
+       WHERE status='published'
+         AND COALESCE(start_at, (event_date || 'T23:59:59+08:00')::timestamptz) > NOW()
+       ORDER BY start_at ASC NULLS LAST, event_date ASC LIMIT 1`
     );
     result = r.rows[0] ? mergeEventDefaults(r.rows[0]) : null;
   } catch (e) {
