@@ -59,6 +59,15 @@ function isEventLive(now = new Date()) {
   return hhmm >= '19:30' && hhmm <= '21:00';
 }
 
+// 報到開放時段：上課前 30 分 ～ 結束後 30 分（依場次 start_at/end_at 動態算）。
+// 目的：場次一結束就不再受理該場報到，避免課後補發簡報/問卷的名單被事後亂入的報到污染。
+function isCheckinOpen(ev, now = Date.now()) {
+  if (!ev || !ev.start_at) return false;
+  const start = new Date(ev.start_at).getTime();
+  const end = ev.end_at ? new Date(ev.end_at).getTime() : start + 90 * 60000;
+  return now >= start - 30 * 60000 && now <= end + 30 * 60000;
+}
+
 // ─── 維護模式：DB 未就緒時不讓整站空轉，回友善維護頁（503）───────────────────
 // 過去 DB 連不上會 process.exit(1) → Render crash-loop → 整站一直轉。
 // 改成：照常開 port，DB 沒好就回維護頁；背景重試，DB 一復原自動恢復（見檔尾啟動區）。
@@ -1171,6 +1180,17 @@ app.post('/webhook', express.raw({ type: '*/*' }), lineMiddleware, async (req, r
       // 線上點名：「報到」keyword（限當前場次 ev.event_date）— 放在 alreadyBound 之前，bound 用戶也能觸發
       // 接受純 keyword 與帶日期前綴（例如「6/1報到」「2026-06-01簽到」）兩種寫法；日期前綴只當語意糖，實際以 ev.event_date 為準
       if (/^(?:\d{1,2}[\/\-]\d{1,2}|\d{4}-\d{2}-\d{2})?\s*(報到|簽到|\+1|我來了|我到了)$/i.test(text)) {
+        // 場次結束（或還沒開始）就不受理報到，避免課後名單被事後亂入的報到污染
+        if (!isCheckinOpen(ev)) {
+          const nowMs = Date.now();
+          const startMs = ev.start_at ? new Date(ev.start_at).getTime() : 0;
+          const notYet = startMs && nowMs < startMs - 30 * 60000;
+          const replyText = notYet
+            ? '⏰ 還沒開始報到喔～\n\n報到會在上課前 30 分鐘開放，到時候在這裡打「報到」就能領課後簡報與問卷 🌱'
+            : '這場已經結束囉，謝謝你的參與 🙌\n\n下一場的日期與報名：\nhttps://event.cosmoseed.com.tw/courses';
+          await lineClient.replyMessage(event.replyToken, { type: 'text', text: replyText });
+          continue;
+        }
         const bindRow = await pool.query(
           `SELECT email FROM line_bindings WHERE line_user_id=$1 AND email IS NOT NULL
            UNION
