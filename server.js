@@ -2028,6 +2028,12 @@ async function sendPostEventSurvey(ev) {
     const text = `嗨 ${reg.name}！\n\n謝謝你參與這場 AI 共學聚 🌱\n📌 主題：${ev.topic}\n\n${slidesBlock}想請你花 2 分鐘填一下回饋，你的意見會幫我們把下一場做得更好 💚\n\n📝 課後問卷：\n${ev.survey_url}\n\n更多場次與報名：\nhttps://event.cosmoseed.com.tw/courses\n\n— Din Din Wang 🧬\nAI 共學聚團隊`;
     await sendEmail(reg.email, subject, text);
   }
+  // 自動收據：寄一份摘要給 admin（EMAIL_USER），當作「已自動發送」的憑證，方便事後核對
+  const adminEmail = process.env.EMAIL_USER;
+  if (adminEmail && result.rows.length) {
+    const summary = `【自動】${ev.event_date} 課後信（簡報+問卷）已寄給全體報名者 ${result.rows.length} 封\n\n📊 簡報：\n${slidesUrl || '(未設)'}\n📝 問卷：\n${ev.survey_url}\n\n收件名單：\n${result.rows.map((r, i) => `${i + 1}. ${r.name} <${r.email}>`).join('\n')}\n\n— AI 共學聚自動寄送 🧬`;
+    await sendEmail(adminEmail, `📮 [自動副件] ${ev.event_date} 課後信已發出 (${result.rows.length} 人)`, summary);
+  }
   console.log(`[Survey] event=${ev.event_date} sent=${result.rows.length} slides=${slidesUrl ? 'y' : 'n'}`);
   return result.rows.length;
 }
